@@ -57,7 +57,7 @@ install-fedora-packages() {
 
   # Install RPM Fusion (free + nonfree) — skip the network install when both
   # release packages are already present. fedora-cisco-openh264 is enabled
-  # unconditionally (setopt is idempotent) so steam/discord deps resolve.
+  # unconditionally (setopt is idempotent) so steam deps resolve.
   if ! rpm -q rpmfusion-free-release rpmfusion-nonfree-release >/dev/null 2>&1; then
     "${SUDO[@]}" dnf install -y \
       "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
@@ -136,7 +136,7 @@ EOF
   "${SUDO[@]}" dnf install -y clang21-libs kernel kernel-devel kernel-devel-matched kernel-headers
 
   # Install packages, grouped by purpose and alphabetised within each group.
-  # steam/discord are bare-metal-only — systemd-detect-virt exits 0 when
+  # steam are bare-metal-only — systemd-detect-virt exits 0 when
   # virtualization is detected, 1 on bare metal.
   "${SUDO[@]}" dnf group install development-tools virtualization "c-development" -y
   local -a packages=(
@@ -247,7 +247,6 @@ EOF
   if ! systemd-detect-virt --quiet; then
     # Bare-metal-only
     packages+=(
-      discord
       steam
     )
   fi
