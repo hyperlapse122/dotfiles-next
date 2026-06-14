@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/linux/config-kde.sh
 #
-# Combined KDE Plasma 6 user-side configuration. Twelve independent steps,
+# Combined KDE Plasma 6 user-side configuration. Thirteen independent steps,
 # each guarded so a missing prerequisite skips that step alone (returning 0)
 # without taking the whole script down:
 #
@@ -171,6 +171,31 @@
 #                 powerdevil reloads its config. The companion "화면 끄기 / Turn
 #                 off screen" (TurnOffDisplay*) action is left untouched.
 #
+#  13. darkmode  - kwriteconfig6 -> ~/.config/kdeglobals
+#                   [KDE]     AutomaticLookAndFeel = false
+#                   [KDE]     LookAndFeelPackage   = org.kde.breezedark.desktop
+#                   [General] ColorScheme          = BreezeDark
+#                 Pins the desktop to the default dark Global Theme ("Breeze
+#                 Dark") and turns OFF the Plasma 6.5+ automatic day/night theme
+#                 switching, so the appearance stays dark instead of following
+#                 the sun. Matches System Settings > Colors & Themes > Global
+#                 Theme: choosing "Breeze Dark" and clearing the "Switch to Dark
+#                 Mode at Night" (automatic) toggle. Keys and types are from
+#                 plasma-workspace's lookandfeelsettings.kcfg [KDE] group:
+#                 AutomaticLookAndFeel (Bool, default false), LookAndFeelPackage
+#                 (String, default org.kde.breeze.desktop = light); BreezeDark is
+#                 the dark color-scheme name under [General] ColorScheme. Applies
+#                 on next login: startplasma's setupPlasmaEnvironment() reapplies
+#                 the Global Theme when LookAndFeelPackage differs from the cached
+#                 active package (~/.config/kdedefaults/package), and re-copies
+#                 the color scheme when its .colors file hash differs from
+#                 [General] ColorSchemeHash - so we write only the scheme NAME and
+#                 let startplasma recompute the hash and copy the color
+#                 definitions (a stale hand-written hash would suppress the
+#                 re-apply). Like the kwinrc steps, kdeglobals is read - not
+#                 owned - at login, so kwriteconfig6 writes it directly with no
+#                 file-exists guard; the write is idempotent.
+#
 # Single-platform (Linux only) by design. KDE Plasma is a Linux desktop
 # environment; macOS uses native font/touchpad APIs and Windows uses the
 # registry, so there is nothing equivalent to configure on either. No .ps1
@@ -192,6 +217,8 @@
 #   - edges                      apply after restarting KWin or logging out/in.
 #   - krunner, killrunner        apply on next KRunner launch (kquitapp6
 #                                krunner to reload a running instance).
+#   - darkmode                   applies after re-login (startplasma reapplies
+#                                the global theme + color scheme at login).
 
 set -euo pipefail
 
@@ -948,6 +975,56 @@ configure_dimscreen() {
 }
 
 # ===========================================================================
+# Step 13: darkmode (pin default dark Global Theme, disable auto day/night)
+# ===========================================================================
+#
+# Sets the desktop to the default dark Global Theme ("Breeze Dark") and turns
+# off the Plasma 6.5+ automatic day/night theme switching, so the appearance
+# stays dark rather than following the sun. Three writes to kdeglobals:
+#   [KDE]     AutomaticLookAndFeel = false                       (disable auto)
+#   [KDE]     LookAndFeelPackage   = org.kde.breezedark.desktop  (dark theme)
+#   [General] ColorScheme          = BreezeDark                  (dark colors)
+#
+# Keys/types are from plasma-workspace's lookandfeelsettings.kcfg [KDE] group:
+# AutomaticLookAndFeel is Bool (schema default false; the "Switch to Dark Mode
+# at Night" toggle) and LookAndFeelPackage is String (schema default
+# org.kde.breeze.desktop, the light theme). BreezeDark is the dark color-scheme
+# name (its .colors file ships in /usr/share/color-schemes).
+#
+# Application: on the next login startplasma's setupPlasmaEnvironment() reads
+# [KDE] LookAndFeelPackage and, when it differs from the cached active package
+# in ~/.config/kdedefaults/package, loads and applies the whole dark Global
+# Theme (KLookAndFeelManager, AllSettings). Independently it re-reads [General]
+# ColorScheme and, when that scheme's .colors file hash no longer matches
+# [General] ColorSchemeHash, copies the color definitions into kdeglobals and
+# rewrites the hash. We therefore write only the scheme NAME and let startplasma
+# recompute ColorSchemeHash and copy the colors - writing a stale hash here
+# would suppress the re-apply. Like krunnerrc/dolphinrc/kwinrc, kdeglobals is
+# read (not owned) at login, so kwriteconfig6 writes it directly with no
+# file-exists guard; the write is idempotent and applies after re-login.
+
+configure_darkmode() {
+  printf 'config-kde.sh: [darkmode] pinning default dark global theme + disabling auto day/night switching...\n'
+
+  if ! command -v kwriteconfig6 >/dev/null 2>&1; then
+    printf '  kwriteconfig6 not found, skipping.\n'
+    return 0
+  fi
+
+  kwriteconfig6 --file kdeglobals --group KDE \
+    --key AutomaticLookAndFeel --type bool false
+  printf '  set [KDE]     AutomaticLookAndFeel = false\n'
+
+  kwriteconfig6 --file kdeglobals --group KDE \
+    --key LookAndFeelPackage org.kde.breezedark.desktop
+  printf '  set [KDE]     LookAndFeelPackage   = org.kde.breezedark.desktop\n'
+
+  kwriteconfig6 --file kdeglobals --group General \
+    --key ColorScheme BreezeDark
+  printf '  set [General] ColorScheme          = BreezeDark\n'
+}
+
+# ===========================================================================
 # Run all steps. Each is independent; set -e propagates any real failure.
 # ===========================================================================
 
@@ -963,5 +1040,6 @@ configure_krunner
 configure_killrunner
 configure_dolphin
 configure_dimscreen
+configure_darkmode
 
-printf 'config-kde.sh: done. Restart plasmashell or re-login to fully apply font, panel, digital clock, and calendar changes; restart KWin (kwin_wayland --replace) or re-login to apply the virtual keyboard and edge changes; KRunner and Dolphin pick up their changes on next launch; the screen-dimming change applies after re-login or when powerdevil reloads its config.\n'
+printf 'config-kde.sh: done. Restart plasmashell or re-login to fully apply font, panel, digital clock, and calendar changes; restart KWin (kwin_wayland --replace) or re-login to apply the virtual keyboard and edge changes; KRunner and Dolphin pick up their changes on next launch; the screen-dimming change and the dark-theme/auto-switch change apply after re-login (or when powerdevil reloads its config, for dimming).\n'
