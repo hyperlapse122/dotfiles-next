@@ -58,6 +58,21 @@
       stdout: true
       stderr: true
 
+# Remove ~/.gitconfig so the managed XDG config (~/.config/git/config) stays
+# authoritative. `gh auth login` / `glab auth login` (scripts/auth/auth-gh.sh /
+# auth-glab.sh) run `git config --global`, whose write target is ~/.gitconfig;
+# git reads ~/.gitconfig AFTER the XDG file, so those gh/glab credential-helper
+# entries would shadow the ones already defined in home/.config/git/config. The
+# managed config does NOT [include] ~/.gitconfig (only ~/.gitconfig.d/*), so
+# deleting the file is safe and leaves ~/.gitconfig.d/ untouched. rm -f no-ops
+# when the file is absent.
+- shell:
+    - command: 'rm -f "$HOME/.gitconfig" && echo "git: removed ~/.gitconfig (gh/glab git config --global cleanup; XDG ~/.config/git/config is authoritative)"'
+      description: Remove ~/.gitconfig (gh/glab credential-helper cleanup; XDG config is authoritative)
+      stdin: true
+      stdout: true
+      stderr: true
+
 # The Codex haptic hooks moved from a symlinked ~/.codex/hooks.json into the
 # managed ~/.codex/config.toml (merged by configure-codex-config). Remove the
 # now-orphaned symlink so Codex doesn't load a dangling hooks.json alongside the

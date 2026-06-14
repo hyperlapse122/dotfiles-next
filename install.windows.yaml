@@ -57,6 +57,25 @@
       stdout: true
       stderr: true
 
+# Remove ~/.gitconfig so the managed XDG config (~/.config/git/config) stays
+# authoritative. `gh auth login` / `glab auth login` run `git config --global`,
+# whose write target is ~/.gitconfig; git reads it AFTER the XDG file, so those
+# gh/glab credential-helper entries would shadow the ones already defined in
+# home/.config/git/config. dotbot runs this shell step under cmd.exe (where `rm`
+# and `$HOME` do not exist), so the removal goes through pwsh, which expands
+# $HOME itself and accepts the forward-slash path. -ErrorAction SilentlyContinue
+# suppresses the "file not found" error, but pwsh still maps the resulting
+# $?=$false to exit code 1 and would fail the dotbot step on the (common) absent
+# case, so the trailing `; exit 0` forces a clean exit either way. The managed
+# config does NOT [include] ~/.gitconfig (only ~/.gitconfig.d/*), so deleting
+# the file is safe.
+- shell:
+    - command: 'pwsh -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue $HOME/.gitconfig; exit 0"'
+      description: Remove ~/.gitconfig (gh/glab credential-helper cleanup; XDG config is authoritative)
+      stdin: true
+      stdout: true
+      stderr: true
+
 # Render tracked *.1password templates into ~/.secrets. The helper no-ops when
 # no templates exist; when templates are present it requires an authenticated
 # `op` CLI session.
