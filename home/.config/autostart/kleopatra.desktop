@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Kleopatra
+Comment=Certificate manager and unified crypto GUI for GnuPG
+Exec=/usr/bin/kleopatra --daemon
+TryExec=/usr/bin/kleopatra
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+Icon=kleopatra
+Categories=Qt;KDE;Utility;Security;
+X-GNOME-Autostart-enabled=true
