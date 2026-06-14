@@ -40,7 +40,7 @@ Pick your OS. Each flow is: **install prerequisites → clone → bootstrap**. T
    ./scripts/linux/install-packages.sh
    ```
 
-   This enables RPM Fusion, the keyd/mise COPRs, and third-party repos (1Password, VSCodium, Google Chrome, Tailscale, Proton VPN, VirtualBox), installs the rootless Podman ecosystem and the rest of the packages, builds the VirtualBox akmods, and enables `keyd` / `tailscaled` / `libvirtd`. **Reboot afterward** — on UEFI + Secure Boot it queues an akmods MOK import, so on the next boot the blue *MOK Manager* screen asks for the one-time password to enroll the signing key and load the freshly-built kernel module; new group memberships also take effect after a re-login/reboot.
+   This enables RPM Fusion, the keyd/mise COPRs, and third-party repos (1Password, VSCodium, Google Chrome, Tailscale, Proton VPN, VirtualBox), installs the rootless Podman ecosystem and the rest of the packages (plus Discord as a Flatpak from Flathub), builds the VirtualBox akmods, and enables `keyd` / `tailscaled` / `libvirtd`. **Reboot afterward** — on UEFI + Secure Boot it queues an akmods MOK import, so on the next boot the blue *MOK Manager* screen asks for the one-time password to enroll the signing key and load the freshly-built kernel module; new group memberships also take effect after a re-login/reboot.
 
 5. **Link the dotfiles and install the toolchain:**
 

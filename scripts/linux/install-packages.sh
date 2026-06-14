@@ -263,6 +263,30 @@ EOF
   "${SUDO[@]}" dnf install -y "${packages[@]}"
 }
 
+install-flatpak-packages() {
+  # flatpak ships on Fedora's desktop spins; only reach for dnf when a minimal
+  # base is missing it (rpm -q avoids a needless network round-trip).
+  if ! rpm -q flatpak >/dev/null 2>&1; then
+    "${SUDO[@]}" dnf install flatpak -y
+  fi
+
+  # Ensure the Flathub remote exists system-wide. fedora-third-party enable
+  # (above) normally registers it, but --if-not-exists keeps this function
+  # self-contained and is a no-op when the remote already exists. Fedora's
+  # Flathub is flagged "filtered" yet still resolves mainstream apps such as
+  # Discord, so no --no-filter is needed. Canonical URL per
+  # https://flathub.org/setup/Fedora.
+  "${SUDO[@]}" flatpak remote-add --if-not-exists --system flathub \
+    https://dl.flathub.org/repo/flathub.flatpakrepo
+
+  # Flatpak applications, alphabetised by app id. flatpak install is idempotent
+  # (an already-installed app is skipped and exits 0), so re-runs are safe.
+  local -a flatpaks=(
+    com.discordapp.Discord
+  )
+  "${SUDO[@]}" flatpak install --system -y --noninteractive flathub "${flatpaks[@]}"
+}
+
 install-dotnet-tools() {
   dotnet tool install -g git-credential-manager
   dotnet tool install -g powershell
@@ -450,6 +474,7 @@ configure-user-groups() {
 }
 
 install-fedora-packages
+install-flatpak-packages
 install-dotnet-tools
 build-akmods
 install-virtualbox-extension-pack
