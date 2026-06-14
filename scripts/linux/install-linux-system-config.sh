@@ -196,6 +196,27 @@ if command -v systemctl >/dev/null 2>&1; then
   "${SUDO[@]}" systemctl mask podman.socket podman.service 2>/dev/null || true
 fi
 
+# Disable zram swap. Fedora's zram-generator-defaults instantiates the
+# systemd-zram-setup@.service template to create a zram-backed swap device
+# (zram0) at boot. Masking the template disables every instance, so the
+# generator's swap setup never runs again. Also turn off any currently-active
+# /dev/zram* swap (swapoff, then `zramctl --reset` to free the device) so the
+# running system matches the next boot. Every step is best-effort and guarded:
+# hosts without zram-generator, without an active zram device, or where swapoff
+# can't free pages under memory pressure must not abort the bootstrap run.
+if command -v systemctl >/dev/null 2>&1; then
+  printf '  -> masking systemd-zram-setup@.service (disable zram swap)\n'
+  "${SUDO[@]}" systemctl mask systemd-zram-setup@.service 2>/dev/null || true
+fi
+for zdev in /dev/zram*; do
+  [[ -b "$zdev" ]] || continue
+  printf '  -> swapoff %s\n' "$zdev"
+  "${SUDO[@]}" swapoff "$zdev" 2>/dev/null || true
+  if command -v zramctl >/dev/null 2>&1; then
+    "${SUDO[@]}" zramctl --reset "$zdev" 2>/dev/null || true
+  fi
+done
+
 # Reload udev rules so freshly-installed rules under /etc/udev/rules.d/
 # (e.g. logitech-receiver.rules, 99-veth-no-ipv6.rules from
 # system/linux/etc/udev/rules.d/) take effect without a reboot.
