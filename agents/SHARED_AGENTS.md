@@ -85,6 +85,11 @@
 - `peerDependencies` are the **exception**: they **MUST NOT** be exact-pinned — declare the widest compatible range (`^<major>`, `>=`, `^18 || ^19`, or `*`). **MUST NOT** "correct" a peer range to an exact pin. Internal lockstep/prerelease-versioned peers are the sub-exception and stay exact-pinned; a project `AGENTS.md` may codify this. (Detail → `js-package-managers`.)
 - Cooldown: a version **MUST** be ≥1 week old — pin the most recent that qualifies. **MUST NOT** add a package to a preapproved / exclude list, nor lower the cooldown, without explicit per-package user approval. (Per-manager override mechanics, exceptions → `js-package-managers`.)
 
+## mise (tool version manager)
+
+- If any command fails with a `mise ERROR … not trusted` message, **MUST** immediately run `mise trust <path-to-mise.toml>` (or `mise trust` in the project root) before retrying. **MUST NOT** proceed with the original command while the trust error persists.
+- After trusting, re-run the original command in the same turn — do not ask the user to do it.
+
 ## GitLab CLI (glab)
 
 - **MUST** pass project paths to `glab` / `glab api` with slashes intact (`group/sub/project`), never URL-encoded (`group%2Fsub%2Fproject`); prefer `:fullpath` when the repo remote points at the target. (Issue / MR / pipeline playbooks → `gitlab-issues`, `pr-mr`, `ci-cd-monitoring`.)
