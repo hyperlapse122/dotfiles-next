@@ -1,15 +1,18 @@
 name: update-opencode-plugin
 
-# Reusable workflow: check ONE opencode plugin's pinned version in the opencode
-# config against the latest GitHub release of its upstream repo, and open a PR
-# bumping it when they differ. Parameterized so it can be reused for any plugin
-# added to opencode later — the caller (opencode-plugin-updates.yml) drives it
-# once per plugin via a matrix.
+# Reusable workflow: check ONE opencode plugin's pinned version across one or
+# more opencode config files against the latest GitHub release of its upstream
+# repo, and open a single PR bumping every file that references it when they
+# differ. Parameterized so it can be reused for any plugin added to opencode
+# later — the caller (opencode-plugin-updates.yml) drives it once per plugin via
+# a matrix.
 #
 # The version bump is a literal, formatting-preserving text substitution
-# (Perl \Q..\E) on the single version token, not a jq rewrite: it preserves the
-# config's exact formatting (tabs, key order, spacing) and keeps the diff to one
-# line. A jq pass would reserialize and reformat the whole file.
+# (Perl \Q..\E) on the version token, not a jq rewrite: it preserves each
+# config's exact formatting (tabs, key order, spacing) and keeps the diff
+# minimal. A jq pass would reserialize and reformat the whole file. The match is
+# anchored on the leading quote + "<plugin>@<version>" and leaves any export
+# subpath after the version (e.g. "<plugin>@<version>/tui" in tui.json) intact.
 
 on:
   workflow_call:
@@ -34,8 +37,14 @@ on:
         required: false
         default: "v"
         type: string
-      config-path:
-        description: Path (repo-relative) to the opencode config file to update.
+      config-paths:
+        description: >-
+          Newline-separated list of repo-relative opencode config files to
+          update for this plugin. Every listed file that references the plugin
+          is bumped in one PR; files that don't reference it are skipped. The
+          current version is read from the first listed file that contains the
+          plugin. An optional export subpath after the version
+          ("<plugin>@<version>/tui") is preserved.
         required: false
         default: "home/.config/opencode/opencode.json"
         type: string
@@ -61,7 +70,7 @@ jobs:
           PLUGIN: ${{ inputs.plugin }}
           REPO: ${{ inputs.repository }}
           TAG_PREFIX: ${{ inputs.tag-prefix }}
-          CONFIG: ${{ inputs.config-path }}
+          CONFIGS: ${{ inputs.config-paths }}
         run: |
           set -euo pipefail
 
@@ -69,21 +78,34 @@ jobs:
           tag="$(gh release view --repo "$REPO" --json tagName --jq '.tagName')"
           latest="${tag#"$TAG_PREFIX"}"
 
-          # Currently pinned entry in the config. Escape the package name
-          # for the grep regex (it may contain '.', etc.; '/' is not special in
-          # ERE so it is left alone to avoid grep's "stray \ before /" warning),
-          # then locate the literal `"<plugin>@<version>"` token.
+          # Escape the package name for the grep regex (it may contain '.', etc.;
+          # '/' is not special in ERE so it is left alone to avoid grep's "stray \
+          # before /" warning).
           esc="$(printf '%s' "$PLUGIN" | sed -E 's/[][\.^$*+?(){}|]/\\&/g')"
-          entry="$(grep -oE "\"${esc}@[^\"]+\"" "$CONFIG" | head -n1 || true)"
-          if [ -z "$entry" ]; then
-            echo "::error::Plugin '$PLUGIN' not found in $CONFIG"
+
+          # Read the currently pinned version from the FIRST listed config that
+          # references the plugin. The token is `"<plugin>@<version>"`, optionally
+          # carrying an export subpath (`"<plugin>@<version>/tui"`); strip the
+          # subpath to get the bare version.
+          current=""
+          found_in=""
+          while IFS= read -r cfg; do
+            [ -n "$cfg" ] || continue
+            entry="$(grep -oE "\"${esc}@[^\"]+\"" "$cfg" | head -n1 || true)"
+            [ -n "$entry" ] || continue
+            tmp="${entry#"\"${PLUGIN}@"}"
+            ver="${tmp%\"}"
+            current="${ver%%/*}"
+            found_in="$cfg"
+            break
+          done <<EOF
+          $CONFIGS
+          EOF
+
+          if [ -z "$found_in" ]; then
+            echo "::error::Plugin '$PLUGIN' not found in any of: $CONFIGS"
             exit 1
           fi
-          # Strip the literal `"<plugin>@` prefix and trailing `"` via bash
-          # parameter expansion (quoted patterns => literal; no regex delimiter
-          # to clash with '/' in scoped package names).
-          tmp="${entry#"\"${PLUGIN}@"}"
-          current="${tmp%\"}"
 
           {
             echo "tag=$tag"
@@ -96,7 +118,7 @@ jobs:
             echo "✓ $PLUGIN is up to date ($current)"
           else
             echo "changed=true" >>"$GITHUB_OUTPUT"
-            echo "↑ $PLUGIN: $current → $latest"
+            echo "↑ $PLUGIN: $current → $latest (from $found_in)"
           fi
 
       - name: Bump version and open PR
@@ -106,7 +128,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           PLUGIN: ${{ inputs.plugin }}
           REPO: ${{ inputs.repository }}
-          CONFIG: ${{ inputs.config-path }}
+          CONFIGS: ${{ inputs.config-paths }}
           CURRENT: ${{ steps.versions.outputs.current }}
           LATEST: ${{ steps.versions.outputs.latest }}
           RELEASE_TAG: ${{ steps.versions.outputs.tag }}
@@ -125,14 +147,36 @@ jobs:
             exit 0
           fi
 
-          # Literal, formatting-preserving substitution. \Q..\E quotes every
-          # metacharacter in the package name and version; env vars avoid @ARGV
-          # confusion with the target file.
-          OLD="\"${PLUGIN}@${CURRENT}\"" NEW="\"${PLUGIN}@${LATEST}\"" \
-            perl -i -pe 's/\Q$ENV{OLD}\E/$ENV{NEW}/g' "$CONFIG"
+          esc="$(printf '%s' "$PLUGIN" | sed -E 's/[][\.^$*+?(){}|]/\\&/g')"
 
-          if git diff --quiet -- "$CONFIG"; then
-            echo "::error::Version bump produced no change to $CONFIG; aborting."
+          # Bump every listed config that references the plugin (skip those that
+          # don't). The literal, formatting-preserving substitution (\Q..\E quotes
+          # every metacharacter; env vars avoid @ARGV confusion) is anchored on
+          # the leading quote + "<plugin>@<version>" and OMITS the trailing quote,
+          # so an export subpath after the version ("/tui" in tui.json) survives.
+          changed_files=()
+          while IFS= read -r cfg; do
+            [ -n "$cfg" ] || continue
+            entry="$(grep -oE "\"${esc}@[^\"]+\"" "$cfg" | head -n1 || true)"
+            [ -n "$entry" ] || continue
+            tmp="${entry#"\"${PLUGIN}@"}"
+            ver="${tmp%\"}"
+            file_current="${ver%%/*}"
+            if [ "$file_current" = "$LATEST" ]; then
+              continue
+            fi
+            OLD="\"${PLUGIN}@${file_current}" NEW="\"${PLUGIN}@${LATEST}" \
+              perl -i -pe 's/\Q$ENV{OLD}\E/$ENV{NEW}/g' "$cfg"
+            if ! git diff --quiet -- "$cfg"; then
+              changed_files+=("$cfg")
+              echo "↑ $cfg: $PLUGIN $file_current → $LATEST"
+            fi
+          done <<EOF
+          $CONFIGS
+          EOF
+
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo "::error::Version bump produced no change in any of: $CONFIGS; aborting."
             exit 1
           fi
 
@@ -140,13 +184,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git switch -c "$branch"
-          git add -- "$CONFIG"
+          git add -- "${changed_files[@]}"
           git commit -m "chore(opencode): bump ${PLUGIN} to ${LATEST}"
           git push -u origin "$branch"
 
-          body="$(cat <<EOF
-          Automated update of \`${PLUGIN}\` in \`${CONFIG}\`.
+          # Markdown bullet list of the bumped files for the PR body. Backticks
+          # are escaped in a double-quoted format (literal, not a substitution).
+          files_md="$(printf -- "- \`%s\`\n" "${changed_files[@]}")"
 
+          body="$(cat <<EOF
+          Automated update of \`${PLUGIN}\` to \`${LATEST}\` in:
+
+          ${files_md}
           | | Version |
           |---|---|
           | Current | \`${CURRENT}\` |

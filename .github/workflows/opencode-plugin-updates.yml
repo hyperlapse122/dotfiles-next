@@ -1,14 +1,17 @@
 name: opencode-plugin-updates
 
-# Hourly check for new releases of the opencode plugins pinned in
-# home/.config/opencode/opencode.json. Each plugin is handled by the reusable
-# update-opencode-plugin.yml workflow, fanned out over a matrix: one entry per
-# plugin. When an upstream release is newer than the pinned version, the
-# reusable workflow opens a PR bumping it.
+# Hourly check for new releases of the opencode plugins pinned in the opencode
+# config files under home/.config/opencode/ (opencode.json and tui.json). Each
+# plugin is handled by the reusable update-opencode-plugin.yml workflow, fanned
+# out over a matrix: one entry per plugin. When an upstream release is newer than
+# the pinned version, the reusable workflow opens a single PR bumping every
+# listed config file that references the plugin.
 #
 # To track a NEW plugin: add one entry to the matrix below — its package name
-# (exactly as written in the opencode config "plugin" array) and the GitHub
-# "owner/repo" that publishes its releases. Nothing else needs to change.
+# (exactly as written in the opencode config "plugin" array), the GitHub
+# "owner/repo" that publishes its releases, and config-paths (the
+# newline-separated config file(s) that pin it; defaults to opencode.json).
+# Nothing else needs to change.
 
 on:
   schedule:
@@ -32,14 +35,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # oh-my-openagent is pinned in both opencode.json and tui.json (the
+          # latter as "<plugin>@<version>/tui"); bump both in one PR.
           - plugin: oh-my-openagent
             repository: code-yeongyu/oh-my-openagent
+            config-paths: |
+              home/.config/opencode/opencode.json
+              home/.config/opencode/tui.json
           - plugin: "@ex-machina/opencode-anthropic-auth"
             repository: ex-machina-co/opencode-anthropic-auth
+            config-paths: home/.config/opencode/opencode.json
     uses: ./.github/workflows/update-opencode-plugin.yml
     with:
       plugin: ${{ matrix.plugin }}
       repository: ${{ matrix.repository }}
+      config-paths: ${{ matrix.config-paths }}
     permissions:
       contents: write
       pull-requests: write

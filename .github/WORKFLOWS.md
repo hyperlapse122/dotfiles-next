@@ -18,7 +18,7 @@ the repository root.
 | [`workflows/rust.yml`](workflows/rust.yml) | CI for the [`crates/`](../crates/) Rust workspace — `cargo check --all-targets` + `cargo test` on pushes to `main` and PRs that touch `crates/**`. |
 | [`workflows/tooling.yml`](workflows/tooling.yml) | CI for everything outside `packages/` and `crates/` — shellcheck (`*.sh`), PSScriptAnalyzer (`*.ps1`), actionlint (the workflows), and a dotbot link-source guard (`install*.yaml`). Four independent jobs. |
 | [`workflows/opencode-plugin-updates.yml`](workflows/opencode-plugin-updates.yml) | Hourly (cron) + manual dispatcher that fans out over a matrix of opencode plugins, calling the reusable `update-opencode-plugin.yml` once per plugin. |
-| [`workflows/update-opencode-plugin.yml`](workflows/update-opencode-plugin.yml) | Reusable (`workflow_call`) workflow that compares one plugin's pinned version in [`home/.config/opencode/opencode.json`](../home/.config/opencode/opencode.json) against the latest GitHub release of its upstream repo and opens a PR bumping it. |
+| [`workflows/update-opencode-plugin.yml`](workflows/update-opencode-plugin.yml) | Reusable (`workflow_call`) workflow that compares one plugin's pinned version across one or more opencode config files (e.g. [`opencode.json`](../home/.config/opencode/opencode.json) + [`tui.json`](../home/.config/opencode/tui.json)) against the latest GitHub release of its upstream repo and opens a single PR bumping every file that references it. |
 
 ## `workflows/packages.yml`
 
@@ -79,29 +79,37 @@ workflow, or `scripts/ci/**`. Four independent jobs on `ubuntu-24.04`:
 
 ## `workflows/opencode-plugin-updates.yml` + `workflows/update-opencode-plugin.yml`
 
-Keep the opencode plugins pinned in
-[`home/.config/opencode/opencode.json`](../home/.config/opencode/opencode.json)
-up to date with their upstream GitHub releases.
+Keep the opencode plugins pinned in the config files under
+[`home/.config/opencode/`](../home/.config/opencode/) — currently
+[`opencode.json`](../home/.config/opencode/opencode.json) and
+[`tui.json`](../home/.config/opencode/tui.json) — up to date with their upstream
+GitHub releases.
 
 - **Dispatcher (`opencode-plugin-updates.yml`).** Runs hourly (`cron: "0 * * * *"`,
   UTC) and on manual `workflow_dispatch`. A single job uses a `matrix` (one entry
-  per plugin) to call the reusable workflow with two inputs: the plugin's package
-  name *exactly as written in the config `plugin` array* and the GitHub
-  `owner/repo` that publishes its releases. **To track a new plugin, add one
-  matrix entry — nothing else changes.** `fail-fast: false` keeps one plugin's
-  failure from aborting the others.
+  per plugin) to call the reusable workflow with three inputs: the plugin's package
+  name *exactly as written in the config `plugin` array*, the GitHub
+  `owner/repo` that publishes its releases, and `config-paths` — the
+  newline-separated list of config files that pin it (`oh-my-openagent` lists both
+  `opencode.json` and `tui.json`; the rest default to `opencode.json`). **To track
+  a new plugin, add one matrix entry — nothing else changes.** `fail-fast: false`
+  keeps one plugin's failure from aborting the others.
 - **Reusable worker (`update-opencode-plugin.yml`, `workflow_call`).** For one
   plugin: reads the latest release tag via `gh release view` (strips the
-  `tag-prefix`, default `v`), reads the currently pinned version from the config,
-  and when they differ, bumps the version and opens a PR (assigned to the repo
-  owner) on a per-version branch `automation/opencode-plugin/<slug>/<version>`.
-  It is idempotent — an existing branch for that exact version short-circuits —
-  and it closes superseded automation PRs for the same plugin so only the newest
-  bump stays open.
+  `tag-prefix`, default `v`), reads the currently pinned version from the first
+  listed config that references the plugin, and when it differs from the latest,
+  bumps the version in **every** listed config that references it and opens a
+  single PR (assigned to the repo owner) on a per-version branch
+  `automation/opencode-plugin/<slug>/<version>`. It is idempotent — an existing
+  branch for that exact version short-circuits — and it closes superseded
+  automation PRs for the same plugin so only the newest bump stays open.
 - **Format-preserving bump.** The worker does a literal substitution (Perl
-  `\Q..\E`) on the single version token rather than a `jq` rewrite, so the
-  config's exact formatting (tabs, key order, spacing) is preserved and the diff
-  stays one line. A `jq` pass would reserialize and reformat the whole file.
+  `\Q..\E`) on the version token rather than a `jq` rewrite, so each config's
+  exact formatting (tabs, key order, spacing) is preserved and the diff stays
+  minimal. A `jq` pass would reserialize and reformat the whole file. The match is
+  anchored on the leading quote + `"<plugin>@<version>"` and leaves any export
+  subpath after the version (e.g. `"<plugin>@<version>/tui"` in `tui.json`)
+  intact.
 - **Requirements.** Both workflows declare `contents: write` + `pull-requests: write`.
   The repo setting *Settings → Actions → General → Workflow permissions → Allow
   GitHub Actions to create and approve pull requests* must be enabled for the
