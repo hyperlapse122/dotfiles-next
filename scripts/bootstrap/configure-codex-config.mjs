@@ -39,7 +39,7 @@
 //   --no-backup   Do not write a <config>.bak before changing the live file.
 //   -h, --help    Show this help.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, chmodSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -61,88 +61,102 @@ const configPath = path.join(codexHome, 'config.toml');
 const BLOCK_BEGIN =
   '# >>> managed by configure-codex-config (codex/codex-config.managed.toml) - do not edit below >>>';
 const BLOCK_END = '# <<< managed by configure-codex-config <<<';
+const OWNER_ONLY_DIR = 0o700;
+const OWNER_ONLY_FILE = 0o600;
+const isUnix = process.platform !== 'win32';
 
-const args = new Set(process.argv.slice(2));
+function main() {
+  const args = new Set(process.argv.slice(2));
 
-if (args.has('--help') || args.has('-h')) {
-  process.stdout.write(
-    [
-      'Usage: configure-codex-config.mjs [--check] [--print] [--no-backup]',
-      '',
-      `Applies the shared settings in ${path.relative(process.cwd(), managedPath)}`,
-      `into the machine-local Codex config ${configPath}, preserving machine-local`,
-      'state such as the [projects] trust table.',
-      '',
-      'Options:',
-      '  --check       Exit 1 if the live config would change; write nothing.',
-      '  --print       Print the would-be result to stdout; write nothing.',
-      '  --no-backup   Do not write a <config>.bak before changing the live file.',
-      '  -h, --help    Show this help.',
-      '',
-    ].join('\n'),
-  );
-  process.exit(0);
-}
-
-const knownFlags = new Set(['--check', '--print', '--no-backup']);
-const unknown = [...args].filter((a) => !knownFlags.has(a));
-if (unknown.length > 0) {
-  fail(`unknown argument(s): ${unknown.join(', ')}`);
-}
-
-const checkOnly = args.has('--check');
-const printOnly = args.has('--print');
-const noBackup = args.has('--no-backup');
-
-if (!existsSync(managedPath)) {
-  fail(`managed settings file not found: ${managedPath}`);
-}
-
-const { scalars, block } = parseManaged(readFileSync(managedPath, 'utf8'));
-
-const configExisted = existsSync(configPath);
-const original = configExisted ? readFileSync(configPath, 'utf8') : '';
-
-let result = original;
-for (const { table, key, value } of scalars) {
-  result = applyAssignment(result, table, key, value);
-}
-if (block !== null) {
-  result = applyManagedBlock(result, block);
-}
-
-if (printOnly) {
-  process.stdout.write(result);
-  process.exit(0);
-}
-
-if (result === original) {
-  if (scalars.length === 0 && block === null) {
-    log('no managed settings declared; nothing to do.');
-  } else {
-    log('config already up to date; no changes needed.');
+  if (args.has('--help') || args.has('-h')) {
+    process.stdout.write(
+      [
+        'Usage: configure-codex-config.mjs [--check] [--print] [--no-backup]',
+        '',
+        `Applies the shared settings in ${path.relative(process.cwd(), managedPath)}`,
+        `into the machine-local Codex config ${configPath}, preserving machine-local`,
+        'state such as the [projects] trust table.',
+        '',
+        'Options:',
+        '  --check       Exit 1 if the live config would change; write nothing.',
+        '  --print       Print the would-be result to stdout; write nothing.',
+        '  --no-backup   Do not write a <config>.bak before changing the live file.',
+        '  -h, --help    Show this help.',
+        '',
+      ].join('\n'),
+    );
+    process.exit(0);
   }
+
+  const knownFlags = new Set(['--check', '--print', '--no-backup']);
+  const unknown = [...args].filter((a) => !knownFlags.has(a));
+  if (unknown.length > 0) {
+    fail(`unknown argument(s): ${unknown.join(', ')}`);
+  }
+
+  const checkOnly = args.has('--check');
+  const printOnly = args.has('--print');
+  const noBackup = args.has('--no-backup');
+
+  if (!existsSync(managedPath)) {
+    fail(`managed settings file not found: ${managedPath}`);
+  }
+
+  const { scalars, block } = parseManaged(readFileSync(managedPath, 'utf8'));
+
+  const configExisted = existsSync(configPath);
+  const original = configExisted ? readFileSync(configPath, 'utf8') : '';
+
+  let result = original;
+  for (const { table, key, value } of scalars) {
+    result = applyAssignment(result, table, key, value);
+  }
+  if (block !== null) {
+    result = applyManagedBlock(result, block);
+  }
+
+  if (printOnly) {
+    process.stdout.write(result);
+    process.exit(0);
+  }
+
+  if (result === original) {
+    if (scalars.length === 0 && block === null) {
+      log('no managed settings declared; nothing to do.');
+    } else {
+      log('config already up to date; no changes needed.');
+    }
+    process.exit(0);
+  }
+
+  if (checkOnly) {
+    fail(
+      `config is out of date. Run scripts/bootstrap/configure-codex-config.sh (or .ps1) to apply ${path.relative(
+        process.cwd(),
+        managedPath,
+      )}.`,
+    );
+  }
+
+  if (!existsSync(codexHome)) {
+    mkdirSync(codexHome, { recursive: true, mode: OWNER_ONLY_DIR });
+  }
+  if (configExisted && !noBackup) {
+    const backupPath = `${configPath}.bak`;
+    writeFileSync(backupPath, original, { mode: OWNER_ONLY_FILE });
+    if (isUnix) chmodSync(backupPath, OWNER_ONLY_FILE);
+  }
+  writeFileSync(configPath, result, configExisted ? undefined : { mode: OWNER_ONLY_FILE });
+  // Preserve a user's explicit mode choice for existing configs; only make a
+  // first-run create owner-only, and always harden the full backup copy above.
+  if (isUnix && !configExisted) chmodSync(configPath, OWNER_ONLY_FILE);
+  log(`${configExisted ? 'updated' : 'created'} ${configPath}.`);
   process.exit(0);
 }
 
-if (checkOnly) {
-  fail(
-    `config is out of date. Run scripts/bootstrap/configure-codex-config.sh (or .ps1) to apply ${path.relative(
-      process.cwd(),
-      managedPath,
-    )}.`,
-  );
+if (import.meta.main) {
+  main();
 }
-
-if (!existsSync(codexHome)) {
-  mkdirSync(codexHome, { recursive: true });
-}
-if (configExisted && !noBackup) {
-  writeFileSync(`${configPath}.bak`, original);
-}
-writeFileSync(configPath, result);
-log(`${configExisted ? 'updated' : 'created'} ${configPath}.`);
-process.exit(0);
 
 // --------------------------------------------------------------------------
 // Managed-file parsing (full TOML via Bun) + partitioning.
@@ -163,7 +177,7 @@ process.exit(0);
  * @param {string} text
  * @returns {{ scalars: ScalarAssignment[], block: string | null }}
  */
-function parseManaged(text) {
+export function parseManaged(text) {
   let parsed;
   try {
     parsed = Bun.TOML.parse(text);
@@ -202,7 +216,7 @@ function parseManaged(text) {
  * @param {string[]} pathSegments
  * @param {ScalarAssignment[]} out
  */
-function flattenScalars(value, pathSegments, out) {
+export function flattenScalars(value, pathSegments, out) {
   if (isScalar(value)) {
     const key = pathSegments[pathSegments.length - 1];
     const table = pathSegments.slice(0, -1).join('.');
@@ -237,7 +251,7 @@ function flattenScalars(value, pathSegments, out) {
  * @param {Record<string, unknown>} obj
  * @returns {string}
  */
-function serializeToml(obj) {
+export function serializeToml(obj) {
   /** @type {string[]} */
   const lines = [];
   emitTable(obj, [], lines);
@@ -254,7 +268,7 @@ function serializeToml(obj) {
  * @param {string[]} pathSegments
  * @param {string[]} lines
  */
-function emitTable(obj, pathSegments, lines) {
+export function emitTable(obj, pathSegments, lines) {
   const entries = Object.entries(obj);
 
   for (const [k, v] of entries) {
@@ -287,7 +301,7 @@ function emitTable(obj, pathSegments, lines) {
  * @param {unknown} value
  * @returns {string}
  */
-function serializeValue(value) {
+export function serializeValue(value) {
   if (typeof value === 'string') {
     return tomlBasicString(value);
   }
@@ -314,7 +328,7 @@ function serializeValue(value) {
  * @param {string} s
  * @returns {string}
  */
-function tomlBasicString(s) {
+export function tomlBasicString(s) {
   let out = '"';
   for (const ch of s) {
     const code = ch.codePointAt(0) ?? 0;
@@ -336,7 +350,7 @@ function tomlBasicString(s) {
  * @param {string} key
  * @returns {string}
  */
-function formatKey(key) {
+export function formatKey(key) {
   return /^[A-Za-z0-9_-]+$/.test(key) ? key : tomlBasicString(key);
 }
 
@@ -345,7 +359,7 @@ function formatKey(key) {
  * @param {string[]} segments
  * @returns {string}
  */
-function formatPath(segments) {
+export function formatPath(segments) {
   return segments.map(formatKey).join('.');
 }
 
@@ -354,12 +368,12 @@ function formatPath(segments) {
 // --------------------------------------------------------------------------
 
 /** @param {unknown} v @returns {boolean} */
-function isPlainObject(v) {
+export function isPlainObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 /** @param {unknown} v @returns {boolean} */
-function isScalar(v) {
+export function isScalar(v) {
   if (
     typeof v === 'string' ||
     typeof v === 'boolean' ||
@@ -375,7 +389,7 @@ function isScalar(v) {
 }
 
 /** @param {unknown} v @returns {boolean} */
-function isArrayOfTables(v) {
+export function isArrayOfTables(v) {
   return Array.isArray(v) && v.length > 0 && v.every(isPlainObject);
 }
 
@@ -385,7 +399,7 @@ function isArrayOfTables(v) {
  * @param {unknown} v
  * @returns {boolean}
  */
-function containsArrayOfTables(v) {
+export function containsArrayOfTables(v) {
   if (isArrayOfTables(v)) {
     return true;
   }
@@ -409,7 +423,7 @@ function containsArrayOfTables(v) {
  * @param {string} body
  * @returns {string}
  */
-function applyManagedBlock(text, body) {
+export function applyManagedBlock(text, body) {
   const fenced = `${BLOCK_BEGIN}\n${body}\n${BLOCK_END}\n`;
 
   const beginIdx = text.indexOf(BLOCK_BEGIN);
@@ -444,7 +458,7 @@ function applyManagedBlock(text, body) {
  * @param {string} value
  * @returns {string}
  */
-function applyAssignment(text, table, key, value) {
+export function applyAssignment(text, table, key, value) {
   const line = `${key} = ${value}`;
   const region = findTableRegion(text, table);
 
@@ -493,7 +507,7 @@ function applyAssignment(text, table, key, value) {
  * @param {string} table
  * @returns {{ start: number, headerEnd: number, end: number } | null}
  */
-function findTableRegion(text, table) {
+export function findTableRegion(text, table) {
   const headers = findHeaderLines(text);
   if (table === '') {
     const end = headers.length > 0 ? headers[0].start : text.length;
@@ -514,7 +528,7 @@ function findTableRegion(text, table) {
  * @param {string} text
  * @returns {{ start: number, end: number, name: string | null }[]}
  */
-function findHeaderLines(text) {
+export function findHeaderLines(text) {
   /** @type {{ start: number, end: number, name: string | null }[]} */
   const headers = [];
   let offset = 0;
@@ -522,8 +536,9 @@ function findHeaderLines(text) {
     const start = offset;
     const end = offset + raw.length + 1; // include the trailing '\n'
     offset = end;
-    if (raw.trim().startsWith('[')) {
-      headers.push({ start, end, name: parseTableHeader(raw.trim()) });
+    const header = parseHeaderLine(raw.trim());
+    if (header.accepted) {
+      headers.push({ start, end, name: header.name });
     }
   }
   return headers;
@@ -535,9 +550,27 @@ function findHeaderLines(text) {
  * @param {string} line
  * @returns {string | null}
  */
-function parseTableHeader(line) {
+export function parseTableHeader(line) {
   const m = /^\[([^[\]]+)\]$/.exec(line);
   return m ? m[1].trim() : null;
+}
+
+/**
+ * Return a parsed TOML table boundary if `line` is a complete standard table or
+ * array-of-tables header. Array-of-tables boundaries have no scalar-editable
+ * table name, so they return `name: null`.
+ * @param {string} line
+ * @returns {{ accepted: boolean, name: string | null }}
+ */
+export function parseHeaderLine(line) {
+  const table = /^\[([^\[\]]+)\](?:\s+#.*)?$/.exec(line);
+  if (table) {
+    return { accepted: true, name: table[1].trim() };
+  }
+  if (/^\[\[([^\[\]]+)\]\](?:\s+#.*)?$/.test(line)) {
+    return { accepted: true, name: null };
+  }
+  return { accepted: false, name: null };
 }
 
 /**
@@ -548,7 +581,7 @@ function parseTableHeader(line) {
  * @param {string} key
  * @returns {{ lineStart: number, lineEnd: number, valueStart: number } | null}
  */
-function findKeyInRegion(text, region, key) {
+export function findKeyInRegion(text, region, key) {
   let offset = region.start;
   const slice = text.slice(region.start, region.end);
   for (const raw of slice.split('\n')) {
@@ -577,7 +610,7 @@ function findKeyInRegion(text, region, key) {
  * @param {string} value
  * @returns {boolean}
  */
-function isSingleLineValue(value) {
+export function isSingleLineValue(value) {
   if (value.includes('"""') || value.includes("'''")) {
     return false;
   }
