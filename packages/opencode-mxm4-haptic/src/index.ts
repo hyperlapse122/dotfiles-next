@@ -81,6 +81,23 @@ async function allChildrenIdle(client: Client, sessionID: string): Promise<boole
   }
 }
 
+async function pulse(client: Client, waveform: WaveformName): Promise<void> {
+  try {
+    await sendCommand(waveform);
+  } catch (error) {
+    await client.app
+      .log({
+        body: {
+          service: serviceName,
+          level: "warn",
+          message: `haptic pulse ${waveform} skipped`,
+          extra: { error },
+        },
+      })
+      .catch(() => {});
+  }
+}
+
 export const MXMaster4HapticPlugin: Plugin = async ({ client }: PluginInput) => {
   return {
     event: async ({ event }) => {
@@ -92,7 +109,7 @@ export const MXMaster4HapticPlugin: Plugin = async ({ client }: PluginInput) => 
           if (await isChildSession(client, sessionID)) return;
           // Only buzz once the root session AND all of its sub-agents are idle.
           if (!(await allChildrenIdle(client, sessionID))) return;
-          await sendCommand("COMPLETED");
+          await pulse(client, "COMPLETED");
         })
         .with({ type: "session.error" }, async (event) => {
           const { sessionID } = event.properties;
@@ -100,17 +117,17 @@ export const MXMaster4HapticPlugin: Plugin = async ({ client }: PluginInput) => 
           // session's failure is worth a pulse. An absent sessionID can't be
           // resolved, so it biases toward still buzzing.
           if (sessionID && (await isChildSession(client, sessionID))) return;
-          await sendCommand("MAD");
+          await pulse(client, "MAD");
         })
         .otherwise(async (event) => {
           if (event.type in EVENT_WAVEFORMS) {
             const waveform = EVENT_WAVEFORMS[event.type];
-            if (waveform) await sendCommand(waveform);
+            if (waveform) await pulse(client, waveform);
           }
         });
     },
     "tool.execute.before": async ({ tool }) => {
-      if (QUESTION_TOOLS.has(tool.toLowerCase())) await sendCommand("RINGING");
+      if (QUESTION_TOOLS.has(tool.toLowerCase())) await pulse(client, "RINGING");
     },
   };
 };

@@ -5,8 +5,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { describe, test } from "node:test";
 
-import { SocketMissingError } from "@h82/mxm4-haptic";
-
 import { MXMaster4HapticPlugin } from "../src/index.ts";
 
 // `sendCommand` resolves the daemon socket from XDG_RUNTIME_DIR at call time and
@@ -336,19 +334,32 @@ describe("MXMaster4HapticPlugin", posixOnly, () => {
     }
   });
 
-  test("daemon socket absent — the event hook REJECTS with SocketMissingError (characterization)", async () => {
-    // FINDING (characterization, not a fix): the plugin does NOT swallow a
-    // missing-daemon error. `sendCommand` rejects with SocketMissingError and
-    // the `event` hook awaits it without a try/catch, so the returned promise
-    // rejects. This pins the CURRENT behavior; src is intentionally untouched.
+  test("daemon socket absent — the event hook resolves and logs a skipped pulse", async () => {
     const runtime = startEmptyRuntimeDir();
-    const { client } = fakeClient({ get: async () => ({ data: {} }) });
+    const { client, logs } = fakeClient({ get: async () => ({ data: {} }) });
     try {
       const hooks = await plugin(client);
-      await assert.rejects(
-        hooks.event!({ event: idleEvent("root-1") } as never),
-        SocketMissingError,
+      await hooks.event!({ event: idleEvent("root-1") } as never);
+      assert.ok(
+        logs.some(
+          (log) =>
+            log.body.level === "warn" && log.body.message === "haptic pulse COMPLETED skipped",
+        ),
       );
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
+  test("daemon socket absent — the question hook resolves and logs a skipped pulse", async () => {
+    const runtime = startEmptyRuntimeDir();
+    const { client, logs } = fakeClient();
+    try {
+      const hooks = await plugin(client);
+      await hooks["tool.execute.before"]!({ tool: "Question" } as never, {} as never);
+      assert.equal(logs.length, 1);
+      assert.equal(logs[0]?.body.level, "warn");
+      assert.equal(logs[0]?.body.message, "haptic pulse RINGING skipped");
     } finally {
       runtime.cleanup();
     }
