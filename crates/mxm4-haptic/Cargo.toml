@@ -38,7 +38,7 @@ path = "src/bin/mxm4-hapticd.rs"
 # three platform features in one stanza is harmless — only the matching OS
 # branch compiles. Only the daemon (mxm4-hapticd) links this; the thin client
 # and notify bridge never touch the device, so they stay hidapi-free.
-hidapi = { version = "=2.6.5", default-features = false, features = [
+hidapi = { version = "=2.6.6", default-features = false, features = [
     "linux-static-hidraw",
     "macos-shared-device",
     "windows-native",
