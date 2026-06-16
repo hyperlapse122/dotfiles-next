@@ -45,18 +45,27 @@ use mxm4_haptic as lib;
 /// waveform before the next fires (the firmware exposes no "playback
 /// done" event, so this is a duration estimate, tunable via env).
 fn pacing_ms() -> u64 {
-    std::env::var("MXM4D_PACING_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(180)
+    std::env::var("MXM4D_PACING_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(180)
 }
 /// Debounce: pulses arriving within this of the last one are dropped.
 fn debounce_ms() -> u64 {
-    std::env::var("MXM4D_DEBOUNCE_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(120)
+    std::env::var("MXM4D_DEBOUNCE_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(120)
 }
 /// Read poll quantum. The single I/O thread blocks in read_timeout() for at
 /// most this long, so it also bounds how late a queued play command is
 /// noticed — kept small (8 ms ≈ imperceptible vs the 180 ms pacing) so
 /// button-hold haptics still feel immediate.
 fn poll_ms() -> i32 {
-    std::env::var("MXM4D_POLL_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(8)
+    std::env::var("MXM4D_POLL_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(8)
 }
 
 #[derive(Clone, Copy)]
@@ -70,7 +79,12 @@ struct Target {
 /// not the MX Master 4) or timeout. 0x41 notifications seen meanwhile keep
 /// `connected` fresh.
 fn get_haptic_index(device: &HidDevice, dev: u8, connected: &mut [bool; 7]) -> Option<u8> {
-    let req = lib::build_get_feature(dev, lib::HAPTIC_FEATURE_HI, lib::HAPTIC_FEATURE_LO, lib::SW_ID);
+    let req = lib::build_get_feature(
+        dev,
+        lib::HAPTIC_FEATURE_HI,
+        lib::HAPTIC_FEATURE_LO,
+        lib::SW_ID,
+    );
     if device.write(&req).is_err() {
         return None;
     }
@@ -89,7 +103,9 @@ fn get_haptic_index(device: &HidDevice, dev: u8, connected: &mut [bool; 7]) -> O
                 }
                 match lib::classify_root_reply(report, dev, lib::SW_ID) {
                     lib::RootReply::FeatureIndex(idx) => return Some(idx),
-                    lib::RootReply::Hidpp20Error(_) | lib::RootReply::Hidpp10Error(_) => return None,
+                    lib::RootReply::Hidpp20Error(_) | lib::RootReply::Hidpp10Error(_) => {
+                        return None
+                    }
                     lib::RootReply::NotForUs => continue,
                 }
             }
@@ -124,7 +140,10 @@ fn discover(device: &HidDevice, connected: &mut [bool; 7]) -> Option<Target> {
     for dev in slots {
         if let Some(haptic_idx) = get_haptic_index(device, dev, connected) {
             eprintln!("mxm4-hapticd: MX Master 4 at slot {dev}, HAPTIC index {haptic_idx}");
-            return Some(Target { dev_idx: dev, haptic_idx });
+            return Some(Target {
+                dev_idx: dev,
+                haptic_idx,
+            });
         }
     }
     None
@@ -185,6 +204,17 @@ fn handle_play(wf_id: u8, device: &HidDevice, st: &mut PlayState) {
     *st.last_play = Instant::now();
 }
 
+fn drain_latest(rx: &Receiver<u8>) -> Result<Option<u8>, TryRecvError> {
+    let mut latest = None;
+    loop {
+        match rx.try_recv() {
+            Ok(wf_id) => latest = Some(wf_id),
+            Err(TryRecvError::Empty) => return Ok(latest),
+            Err(TryRecvError::Disconnected) => return Err(TryRecvError::Disconnected),
+        }
+    }
+}
+
 /// The single I/O-owner loop. Polls the device for input reports, processes
 /// 0x41 reconnect notifications, and services queued play commands between
 /// reads. Never returns: exits the process on a read error (receiver
@@ -230,8 +260,8 @@ fn io_loop(device: HidDevice, rx: Receiver<u8>) -> ! {
             }
         }
 
-        match rx.try_recv() {
-            Ok(wf_id) => {
+        match drain_latest(&rx) {
+            Ok(Some(wf_id)) => {
                 let mut st = PlayState {
                     connected: &mut connected,
                     target: &mut target,
@@ -243,7 +273,8 @@ fn io_loop(device: HidDevice, rx: Receiver<u8>) -> ! {
                 };
                 handle_play(wf_id, &device, &mut st);
             }
-            Err(TryRecvError::Empty) => {}
+            Ok(None) => {}
+            Err(TryRecvError::Empty) => unreachable!("drain_latest converts Empty to Ok(None)"),
             Err(TryRecvError::Disconnected) => std::process::exit(0),
         }
     }
@@ -272,7 +303,10 @@ fn open_hidpp(api: &mut HidApi) -> HidDevice {
                     return device;
                 }
                 Err(e) => {
-                    eprintln!("mxm4-hapticd: open {} failed ({e}); retrying", path.to_string_lossy())
+                    eprintln!(
+                        "mxm4-hapticd: open {} failed ({e}); retrying",
+                        path.to_string_lossy()
+                    )
                 }
             }
         }
@@ -320,4 +354,28 @@ fn main() -> ExitCode {
     };
     let device = open_hidpp(&mut api);
     io_loop(device, rx);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn drain_latest_returns_newest_queued_waveform() {
+        let (tx, rx) = mpsc::channel();
+        tx.send(2).unwrap();
+        tx.send(7).unwrap();
+        tx.send(14).unwrap();
+
+        assert_eq!(drain_latest(&rx), Ok(Some(14)));
+        assert_eq!(drain_latest(&rx), Ok(None));
+    }
+
+    #[test]
+    fn drain_latest_reports_disconnect_after_queue_is_empty() {
+        let (tx, rx) = mpsc::channel();
+        drop(tx);
+
+        assert_eq!(drain_latest(&rx), Err(TryRecvError::Disconnected));
+    }
 }
