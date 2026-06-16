@@ -15,8 +15,8 @@ the repository root.
 |---|---|
 | [`workflows/packages.yml`](workflows/packages.yml) | CI for the [`packages/`](../packages/) Yarn workspace — builds, typechecks, and tests every member on pushes to `main` and on PRs that touch `packages/**`. |
 | [`workflows/lint.yml`](workflows/lint.yml) | CI for the [`packages/`](../packages/) Yarn workspace — ESLint lint + Prettier format-check on every member, on the same triggers. Split from `packages.yml` so a style regression is reported independently of a build/test failure. |
-| [`workflows/rust.yml`](workflows/rust.yml) | CI for the [`crates/`](../crates/) Rust workspace — `cargo check --all-targets` + `cargo test` on pushes to `main` and PRs that touch `crates/**`. |
-| [`workflows/tooling.yml`](workflows/tooling.yml) | CI for everything outside `packages/` and `crates/` — shellcheck (`*.sh`), PSScriptAnalyzer (`*.ps1`), actionlint (the workflows), and a dotbot link-source guard (`install*.yaml`). Four independent jobs. |
+| [`workflows/rust.yml`](workflows/rust.yml) | CI for the [`crates/`](../crates/) Rust workspace — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo check --all-targets`, and `cargo test` on pushes to `main` and PRs that touch `crates/**`. |
+| [`workflows/tooling.yml`](workflows/tooling.yml) | CI for everything outside `packages/` and `crates/` — shellcheck (`*.sh`), PSScriptAnalyzer (`*.ps1`), actionlint (the workflows), a dotbot link-source guard (`install*.yaml`), and the Codex config merger Bun tests. Five independent jobs. |
 | [`workflows/opencode-plugin-updates.yml`](workflows/opencode-plugin-updates.yml) | Hourly (cron) + manual dispatcher that fans out over a matrix of opencode plugins, calling the reusable `update-opencode-plugin.yml` once per plugin. |
 | [`workflows/update-opencode-plugin.yml`](workflows/update-opencode-plugin.yml) | Reusable (`workflow_call`) workflow that compares one plugin's pinned version across one or more opencode config files (e.g. [`opencode.json`](../home/.config/opencode/opencode.json) + [`tui.json`](../home/.config/opencode/tui.json)) against the latest GitHub release of its upstream repo and opens a single PR bumping every file that references it. |
 
@@ -57,14 +57,17 @@ the repository root.
   `apt-get install -y libudev-dev`.
 - **Caching.** `actions/cache` caches `~/.cargo/registry`, `~/.cargo/git`, and
   `crates/mxm4-haptic/target`, keyed on `crates/mxm4-haptic/Cargo.lock`.
-- **Steps.** `cargo check --all-targets` then `cargo test` (both via
+- **Steps.** `rustup component add clippy rustfmt`, then `cargo fmt --check`,
+  `cargo clippy --all-targets --all-features -- -D warnings`,
+  `cargo check --all-targets`, and `cargo test` (all via
   `--manifest-path crates/mxm4-haptic/Cargo.toml`).
 
 ## `workflows/tooling.yml`
 
 Gates everything outside the `packages/` and `crates/` workspaces. Triggers on
 pushes to `main` and PRs touching any `*.sh`, `*.ps1`, `install*.yaml`, a
-workflow, or `scripts/ci/**`. Four independent jobs on `ubuntu-24.04`:
+workflow, `scripts/ci/**`, or the Codex config merger files. Five independent
+jobs on `ubuntu-24.04`:
 
 - **shellcheck.** Runs `shellcheck` over every tracked `*.sh`
   (`git ls-files '*.sh' | xargs shellcheck`); installs shellcheck only if the
@@ -76,6 +79,9 @@ workflow, or `scripts/ci/**`. Four independent jobs on `ubuntu-24.04`:
 - **dotbot-links.** Runs [`scripts/ci/check-dotbot-links.mjs`](../scripts/ci/check-dotbot-links.mjs),
   a zero-dependency Node guard that fails if any dotbot `link:` source in the
   four `install*.yaml` files does not resolve to a real path in the repo.
+- **codex-config.** Uses `jdx/mise-action` to provision Bun, then runs
+  `mise exec bun@latest -- bun test scripts/bootstrap/` so the surgical Codex
+  config merger is tested before bootstrap changes ship.
 
 ## `workflows/opencode-plugin-updates.yml` + `workflows/update-opencode-plugin.yml`
 

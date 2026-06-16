@@ -1,10 +1,10 @@
 name: tooling
 
-# CI for everything outside the packages/ Yarn workspace: the shell scripts
-# (shellcheck), the PowerShell scripts (PSScriptAnalyzer), the GitHub Actions
-# workflows themselves (actionlint), and the dotbot install*.yaml link sources
-# (a Node guard). Each lane is its own job so a failure in one is reported
-# independently. Triggers on any change to those surfaces.
+# CI for everything outside the packages/ Yarn workspace: shell scripts
+# (shellcheck), PowerShell scripts (PSScriptAnalyzer), GitHub Actions workflows
+# (actionlint), dotbot install*.yaml link sources (a Node guard), and the Bun
+# Codex config merger tests. Each lane is its own job so a failure in one is
+# reported independently. Triggers on any change to those surfaces.
 
 on:
   push:
@@ -14,6 +14,9 @@ on:
       - "**/*.ps1"
       - "install*.yaml"
       - ".github/workflows/**"
+      - "codex/codex-config.managed.toml"
+      - "scripts/bootstrap/configure-codex-config.mjs"
+      - "scripts/bootstrap/configure-codex-config.test.mjs"
       - "scripts/ci/**"
   pull_request:
     paths:
@@ -21,6 +24,9 @@ on:
       - "**/*.ps1"
       - "install*.yaml"
       - ".github/workflows/**"
+      - "codex/codex-config.managed.toml"
+      - "scripts/bootstrap/configure-codex-config.mjs"
+      - "scripts/bootstrap/configure-codex-config.test.mjs"
       - "scripts/ci/**"
 
 permissions:
@@ -92,3 +98,16 @@ jobs:
       # Node is preinstalled on the runner; the guard is zero-dependency.
       - name: Verify dotbot link sources
         run: node scripts/ci/check-dotbot-links.mjs
+
+  codex-config:
+    name: codex-config
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up mise toolchain (Bun)
+        uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+
+      - name: Run Codex config merger tests
+        run: mise exec bun@latest -- bun test scripts/bootstrap/

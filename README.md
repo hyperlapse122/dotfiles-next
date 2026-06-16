@@ -124,6 +124,6 @@ Run once per OS, `install.sh` / `install.ps1` invoke `mise exec uv@latest -- uvx
 | [`packages/`](./packages/) | Private `@h82/dotfiles` Yarn Berry monorepo of TS/JS libraries — built in place, never installed |
 | [`agents/`](./agents/) | Cross-tool AI agent rules and slash commands linked into OpenCode & Codex |
 | [`codex/`](./codex/) | Tracked shared OpenAI Codex config (incl. MX Master 4 haptic `[[hooks.*]]`) merged into `~/.codex/config.toml` |
-| [`.github/`](./.github/) | CI for the `packages/` workspace (build/typecheck/test, lint), the `crates/` Rust workspace (`rust.yml`: cargo check/test), and the rest of the repo (`tooling.yml`: shellcheck, PSScriptAnalyzer, actionlint, dotbot link guard), plus the hourly opencode-plugin bump workflow |
+| [`.github/`](./.github/) | CI for the `packages/` workspace (build/typecheck/test, lint), the `crates/` Rust workspace (`rust.yml`: cargo fmt/clippy/check/test), and the rest of the repo (`tooling.yml`: shellcheck, PSScriptAnalyzer, actionlint, dotbot link guard, Codex config tests), plus the hourly opencode-plugin bump workflow |
 
 [`AGENTS.md`](./AGENTS.md) is the authoritative source for repo conventions — read it before adding files. Every tracked top-level directory carries its own `README.md`.
