@@ -68,7 +68,10 @@ pub const WAVEFORMS: &[(&str, u8)] = &[
 /// Resolve a (case-insensitive) waveform name to its firmware id.
 pub fn waveform_id(name: &str) -> Option<u8> {
     let upper = name.to_uppercase();
-    WAVEFORMS.iter().find(|(n, _)| *n == upper).map(|(_, id)| *id)
+    WAVEFORMS
+        .iter()
+        .find(|(n, _)| *n == upper)
+        .map(|(_, id)| *id)
 }
 
 /// All waveform names, for usage/error output.
@@ -88,13 +91,14 @@ pub const WINDOWS_PIPE_PATH: &str = r"\\.\pipe\mxm4-haptic";
 ///
 /// Windows: a named pipe (`\\.\pipe\mxm4-haptic`); std has no AF_UNIX there.
 ///
-/// Unix: an AF_UNIX socket in the per-user runtime dir so it is never
-/// reachable outside this user session.
+/// Unix: an AF_UNIX socket in the per-user runtime dir, bound with owner-only
+/// permissions so it is never reachable outside this user session.
 ///   Linux: `$XDG_RUNTIME_DIR` (a 0700 tmpfs the kernel reaps on logout).
 ///   macOS: there is no `XDG_RUNTIME_DIR`; fall back to `$TMPDIR`, which
 ///   launchd sets per-user to the private 0700 `DARWIN_USER_TEMP_DIR`
 ///   (`/var/folders/.../T/`) — the closest equivalent. Last-resort `/tmp`
-///   keeps the client/daemon able to rendezvous on an unusual session.
+///   keeps the client/daemon able to rendezvous on an unusual session while the
+///   socket file mode still enforces owner-only access.
 pub fn socket_path() -> Option<String> {
     #[cfg(windows)]
     {
@@ -152,6 +156,7 @@ pub fn send_command(name: &str) -> io::Result<()> {
 #[cfg(unix)]
 mod ipc_server {
     use std::io::{self, BufRead, BufReader};
+    use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixListener;
 
     pub struct IpcServer {
@@ -161,11 +166,13 @@ mod ipc_server {
 
     impl IpcServer {
         pub fn bind() -> io::Result<Self> {
-            let endpoint = super::socket_path()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no runtime dir for socket"))?;
+            let endpoint = super::socket_path().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "no runtime dir for socket")
+            })?;
             // Remove any stale socket from an unclean exit before binding.
             let _ = std::fs::remove_file(&endpoint);
             let listener = UnixListener::bind(&endpoint)?;
+            std::fs::set_permissions(&endpoint, std::fs::Permissions::from_mode(0o600))?;
             Ok(Self { listener, endpoint })
         }
 
@@ -213,7 +220,10 @@ mod ipc_server {
             let endpoint = super::socket_path()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no named-pipe path"))?;
             let name_wide = OsStr::new(&endpoint).encode_wide().chain(Some(0)).collect();
-            Ok(Self { name_wide, endpoint })
+            Ok(Self {
+                name_wide,
+                endpoint,
+            })
         }
 
         pub fn endpoint(&self) -> &str {
@@ -254,10 +264,20 @@ mod ipc_server {
             let mut buf = [0u8; 64];
             let mut read: u32 = 0;
             let ok = unsafe {
-                ReadFile(pipe, buf.as_mut_ptr(), buf.len() as u32, &mut read, ptr::null_mut())
+                ReadFile(
+                    pipe,
+                    buf.as_mut_ptr(),
+                    buf.len() as u32,
+                    &mut read,
+                    ptr::null_mut(),
+                )
             };
             let name = if ok != 0 && read > 0 {
-                Some(String::from_utf8_lossy(&buf[..read as usize]).trim().to_uppercase())
+                Some(
+                    String::from_utf8_lossy(&buf[..read as usize])
+                        .trim()
+                        .to_uppercase(),
+                )
             } else {
                 None
             };
@@ -395,6 +415,14 @@ pub fn parse_connection_notification(buf: &[u8]) -> Option<(u8, bool)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::sync::{Mutex, OnceLock};
+
+    #[cfg(unix)]
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     // -----------------------------------------------------------------------
     // Step 2: Waveform catalogue
@@ -552,48 +580,33 @@ mod tests {
     #[test]
     fn classify_root_reply_wrong_dev_idx() {
         let buf = [0x10u8, 0x03, 0x00, 0x0E, 0x05, 0x00, 0x00];
-        assert_eq!(
-            classify_root_reply(&buf, 0x01, 0x0E),
-            RootReply::NotForUs
-        );
+        assert_eq!(classify_root_reply(&buf, 0x01, 0x0E), RootReply::NotForUs);
     }
 
     #[test]
     fn classify_root_reply_wrong_sw_id() {
         // success path but sw_id mismatch
         let buf = [0x10u8, 0x01, 0x00, 0x0A, 0x05, 0x00, 0x00];
-        assert_eq!(
-            classify_root_reply(&buf, 0x01, 0x0E),
-            RootReply::NotForUs
-        );
+        assert_eq!(classify_root_reply(&buf, 0x01, 0x0E), RootReply::NotForUs);
     }
 
     #[test]
     fn classify_root_reply_buf_too_short() {
         let buf = [0x10u8, 0x01, 0x00, 0x0E, 0x05, 0x00];
-        assert_eq!(
-            classify_root_reply(&buf, 0x01, 0x0E),
-            RootReply::NotForUs
-        );
+        assert_eq!(classify_root_reply(&buf, 0x01, 0x0E), RootReply::NotForUs);
     }
 
     #[test]
     fn classify_root_reply_long_report_too_short() {
         // report id 0x11 but only 7 bytes (< 20)
         let buf = [0x11u8, 0x01, 0x00, 0x0E, 0x05, 0x00, 0x00];
-        assert_eq!(
-            classify_root_reply(&buf, 0x01, 0x0E),
-            RootReply::NotForUs
-        );
+        assert_eq!(classify_root_reply(&buf, 0x01, 0x0E), RootReply::NotForUs);
     }
 
     #[test]
     fn classify_root_reply_unknown_report_id() {
         let buf = [0x20u8, 0x01, 0x00, 0x0E, 0x05, 0x00, 0x00];
-        assert_eq!(
-            classify_root_reply(&buf, 0x01, 0x0E),
-            RootReply::NotForUs
-        );
+        assert_eq!(classify_root_reply(&buf, 0x01, 0x0E), RootReply::NotForUs);
     }
 
     // -----------------------------------------------------------------------
@@ -640,6 +653,7 @@ mod tests {
     #[test]
     fn socket_path_unix_env_resolution() {
         use std::env;
+        let _guard = env_lock().lock().unwrap();
 
         // Save originals
         let orig_xdg = env::var("XDG_RUNTIME_DIR").ok();
@@ -670,12 +684,51 @@ mod tests {
             env::remove_var("XDG_RUNTIME_DIR");
             env::remove_var("TMPDIR");
         }
-        assert_eq!(
-            socket_path(),
-            Some("/tmp/mxm4-haptic.sock".to_string())
-        );
+        assert_eq!(socket_path(), Some("/tmp/mxm4-haptic.sock".to_string()));
 
         // Restore originals
+        unsafe {
+            match orig_xdg {
+                Some(v) => env::set_var("XDG_RUNTIME_DIR", v),
+                None => env::remove_var("XDG_RUNTIME_DIR"),
+            }
+            match orig_tmp {
+                Some(v) => env::set_var("TMPDIR", v),
+                None => env::remove_var("TMPDIR"),
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ipc_server_socket_is_owner_only() {
+        use std::env;
+        use std::os::unix::fs::PermissionsExt;
+        let _guard = env_lock().lock().unwrap();
+
+        let orig_xdg = env::var("XDG_RUNTIME_DIR").ok();
+        let orig_tmp = env::var("TMPDIR").ok();
+        let dir = env::temp_dir().join(format!("mxm4-haptic-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp runtime dir");
+
+        unsafe {
+            env::set_var("XDG_RUNTIME_DIR", &dir);
+            env::remove_var("TMPDIR");
+        }
+
+        let server = IpcServer::bind().expect("bind ipc socket");
+        let mode = std::fs::metadata(server.endpoint())
+            .expect("socket metadata")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600);
+
+        let endpoint = server.endpoint().to_string();
+        drop(server);
+        let _ = std::fs::remove_file(endpoint);
+        let _ = std::fs::remove_dir(&dir);
+
         unsafe {
             match orig_xdg {
                 Some(v) => env::set_var("XDG_RUNTIME_DIR", v),
