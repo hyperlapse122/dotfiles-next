@@ -1,9 +1,10 @@
 name: rust
 
 # CI for the crates/ Rust workspace (currently the mxm4-haptic bin+lib crate).
-# cargo check (--all-targets) + cargo test on every push to main and on PRs that
-# touch crates/**. The Linux build needs libudev headers (the hidapi hidraw
-# backend); rustup is preinstalled on the runner, so no third-party Rust action.
+# cargo fmt, clippy, check (--all-targets), and test on every push to main and
+# on PRs that touch crates/**. The Linux build needs libudev headers (the hidapi
+# hidraw backend); rustup is preinstalled on the runner, so no third-party Rust
+# action.
 
 on:
   push:
@@ -39,6 +40,9 @@ jobs:
       - name: Log toolchain versions
         run: rustc --version && cargo --version
 
+      - name: Ensure clippy + rustfmt
+        run: rustup component add clippy rustfmt
+
       # Cache the cargo registry/git clones and the crate's target dir, keyed on
       # the tracked Cargo.lock.
       - name: Cache cargo
@@ -51,6 +55,12 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('crates/mxm4-haptic/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      - name: cargo fmt (check)
+        run: cargo fmt --manifest-path crates/mxm4-haptic/Cargo.toml --check
+
+      - name: cargo clippy (all targets, deny warnings)
+        run: cargo clippy --manifest-path crates/mxm4-haptic/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: cargo check (all targets)
         run: cargo check --manifest-path crates/mxm4-haptic/Cargo.toml --all-targets

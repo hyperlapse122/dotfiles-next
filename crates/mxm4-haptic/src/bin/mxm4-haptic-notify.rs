@@ -35,7 +35,10 @@ use std::time::{Duration, Instant};
 
 #[cfg(target_os = "linux")]
 fn env_u64(key: &str, default: u64) -> u64 {
-    std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 /// First `string "..."` arg in a dbus-monitor message block = app_name.
@@ -92,8 +95,9 @@ fn main() -> ExitCode {
 #[cfg(target_os = "linux")]
 fn main() -> ExitCode {
     let min_gap = Duration::from_millis(env_u64("MXM4_NOTIFY_MIN_GAP_MS", 800));
-    let skip_replaces =
-        std::env::var("MXM4_NOTIFY_SKIP_REPLACES").map(|v| v != "0").unwrap_or(true);
+    let skip_replaces = std::env::var("MXM4_NOTIFY_SKIP_REPLACES")
+        .map(|v| v != "0")
+        .unwrap_or(true);
     let deny: Vec<String> = std::env::var("MXM4_NOTIFY_DENY")
         .unwrap_or_default()
         .split(',')
