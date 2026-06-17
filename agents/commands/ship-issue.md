@@ -25,13 +25,13 @@ or any subset thereof. Treat a bare URL as the same intent. For issue/work-item 
 
 Classify the URL into one of:
 
-| Pattern | Host | Kind |
-|---|---|---|
-| `https://github.com/<owner>/<repo>/issues/<N>` | GitHub | issue |
-| `https://github.com/<owner>/<repo>/pull/<N>` | GitHub | PR |
-| `https://<gitlab-host>/<group>/<project>/-/issues/<N>` | GitLab | issue |
-| `https://<gitlab-host>/<group>/<project>/-/work_items/<N>` | GitLab | work item |
-| `https://<gitlab-host>/<group>/<project>/-/merge_requests/<N>` | GitLab | MR |
+| Pattern                                                        | Host   | Kind      |
+| -------------------------------------------------------------- | ------ | --------- |
+| `https://github.com/<owner>/<repo>/issues/<N>`                 | GitHub | issue     |
+| `https://github.com/<owner>/<repo>/pull/<N>`                   | GitHub | PR        |
+| `https://<gitlab-host>/<group>/<project>/-/issues/<N>`         | GitLab | issue     |
+| `https://<gitlab-host>/<group>/<project>/-/work_items/<N>`     | GitLab | work item |
+| `https://<gitlab-host>/<group>/<project>/-/merge_requests/<N>` | GitLab | MR        |
 
 Capture: `host`, `kind`, `owner|group`, `repo|project`, `id` (`N`).
 
@@ -430,6 +430,7 @@ Then:
    ```
 
    Pushing updates the PR/MR head SHA. Loop back to Phase 5a with the new SHA.
+
 4. **Failure budget**: after **3 consecutive** push-fix-fail cycles on the same job, STOP. Summarize attempts to the user, link the failing run, and ask before continuing. Do not blindly thrash.
 
 Never delete failing tests to make the pipeline green. Never disable a check with `--no-verify`, `[skip ci]`, or job allow-list edits without explicit user approval.
@@ -444,13 +445,42 @@ glab issue close <N> -R <group>/<project>
 
 (The user normally does this; only do it yourself if the user explicitly asked for the end-to-end close.)
 
+## Completion contract — no deferred follow-ups
+
+One issue → one MR that **fully** resolves it. The MR is done only when **every** in-scope item is
+actually delivered in this MR — implementation, tests, stories, docs, the changeset, and **every
+acceptance-criteria checkbox** the issue lists. There is no "phase 2", no follow-up issue, no
+follow-up PR, no `// TODO` left for later.
+
+- **MUST NOT** mark the MR ready or report success while any acceptance-criteria item is
+  unimplemented, partially implemented, stubbed, reverted, or replaced with a weaker substitute
+  (e.g. an unstyled/placeholder artifact in place of the real one).
+- **MUST NOT** "defer" an item by any of: filing or recommending a separate follow-up issue/PR,
+  leaving a TODO/FIXME, downgrading it to a "known limitation" note, or deleting/loosening the
+  criterion. Difficulty, size, or "out of MR scope" are NOT acceptable reasons — large issues get
+  more commits, not fewer delivered items.
+- **MUST** treat every checkbox in the issue's acceptance criteria as a hard gate: tick it only when
+  the real thing is delivered and verified; never leave it unchecked at "ready".
+
+### The only allowed incomplete state: a surfaced, user-acknowledged blocker
+
+If an item is genuinely impossible right now — a confirmed upstream tooling bug, missing
+credentials/access, an irreversible/destructive action, or a decision that needs human judgment — you
+**MUST STOP before declaring done** and surface it to the user with (1) concrete evidence it is
+blocked (logs, diagnostics, the exact failure), (2) a proposed path to resolve it, and (3) an explicit
+request for a decision — then wait. Silently deferring a blocked item and reporting the MR as ready is
+forbidden. "I couldn't easily do it, so I left a follow-up" is a deferral, not a blocker.
+
 ## Stop conditions
 
 End the run and report to the user when **any** of these is true:
 
-- Pipeline is green (success path).
+- Pipeline is green **and every acceptance-criteria item is delivered in the MR** (success path). A
+  green pipeline with unchecked or deferred acceptance items is NOT done — keep working or, for a
+  genuine blocker, surface it per the Completion contract.
 - Failure budget exhausted (3 consecutive failed fix attempts on the same job).
 - A required step needs human judgment: secret rotation, migration rollback, destructive cleanup, prod deploy gate.
+- An acceptance item is genuinely blocked (upstream tooling bug, missing access, needs human judgment) — surface it with evidence + a proposed path per the Completion contract, then wait for a decision. Do NOT silently defer.
 - The issue is too thin to act on (no repro, no acceptance criteria) — post a triage comment and stop.
 
 ## Hard rules (project-wide, copied here for visibility)
@@ -468,6 +498,7 @@ End the run and report to the user when **any** of these is true:
 - **MUST NOT** commit secrets (`.env`, private keys, tokens) even transiently.
 - **MUST NOT** run destructive shortcuts (`--no-verify`, `--force` to shared branches, history rewrite on pushed commits, `[skip ci]`) without explicit user request.
 - **MUST** match the project's standard verification gate (test / lint / typecheck / build) locally before pushing.
+- **MUST** deliver every acceptance-criteria item in this one MR; **MUST NOT** defer any item to a follow-up issue/PR, a TODO, or a "known limitation" note (see [Completion contract](#completion-contract--no-deferred-follow-ups)). The only allowed incomplete item is a genuine blocker surfaced to the user with evidence + a proposed path + an explicit deferral/descope decision.
 
 ## Output to the user
 

@@ -2,18 +2,18 @@
 
 > **Precedence**: Project-level `AGENTS.md` overrides any rule here on conflict. Otherwise these rules apply.
 > **Style**: [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) keywords — **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**.
-> **Skills**: This core holds the rules that bind on *every* task. Operation-specific playbooks live in on-demand skills — load the named skill **before** doing the matching operation (see Routing Index). The guardrails below never depend on a skill loading.
+> **Skills**: This core holds the rules that bind on _every_ task. Operation-specific playbooks live in on-demand skills — load the named skill **before** doing the matching operation (see Routing Index). The guardrails below never depend on a skill loading.
 
 ## Routing Index
 
-| Before you… | Load skill | What it covers |
-|---|---|---|
-| **create or manage a PR/MR** — REQUIRED: load before any `gh pr create` / `glab mr create` | `pr-mr` | draft-first ordering, duplicate/source-branch traps, issue-linking, pre-create gates, checkbox sync |
-| read or create GitLab issues / tasks / work items / labels / uploads / descriptions | `gitlab-issues` | read flow, issue-vs-task, labels, planning metadata, image uploads, templates |
-| monitor or fix a CI/CD pipeline | `ci-cd-monitoring` | poll states, CLI recipes, fix-red procedure, pre-existing-failure exception |
-| name/rename a branch, write a commit, or resolve a rebase | `git-workflow` | forbidden-shape table, rename recipes, commit-type table, rebase intent resolution |
-| edit `package.json` deps, lifecycle-script overrides, or cooldown handling | `js-package-managers` | per-manager override mechanics, exact-pin correction, cooldown handling |
-| drive a browser / run Playwright tests | `playwright-cli` | usage (host-safety rule is in core below) |
+| Before you…                                                                                | Load skill            | What it covers                                                                                      |
+| ------------------------------------------------------------------------------------------ | --------------------- | --------------------------------------------------------------------------------------------------- |
+| **create or manage a PR/MR** — REQUIRED: load before any `gh pr create` / `glab mr create` | `pr-mr`               | draft-first ordering, duplicate/source-branch traps, issue-linking, pre-create gates, checkbox sync |
+| read or create GitLab issues / tasks / work items / labels / uploads / descriptions        | `gitlab-issues`       | read flow, issue-vs-task, labels, planning metadata, image uploads, templates                       |
+| monitor or fix a CI/CD pipeline                                                            | `ci-cd-monitoring`    | poll states, CLI recipes, fix-red procedure, pre-existing-failure exception                         |
+| name/rename a branch, write a commit, or resolve a rebase                                  | `git-workflow`        | forbidden-shape table, rename recipes, commit-type table, rebase intent resolution                  |
+| edit `package.json` deps, lifecycle-script overrides, or cooldown handling                 | `js-package-managers` | per-manager override mechanics, exact-pin correction, cooldown handling                             |
+| drive a browser / run Playwright tests                                                     | `playwright-cli`      | usage (host-safety rule is in core below)                                                           |
 
 ## Secrets (guardrail)
 
@@ -50,6 +50,11 @@
 
 - **MUST** monitor the pipeline to a terminal state on every push that opens or updates a PR/MR — the task is done when it lands green, not when the push succeeds. **MUST NOT** declare ready / complete while a pipeline is failing, cancelled, or running.
 - **MUST NOT** "fix" a red pipeline by disabling / skipping / deleting a job, re-running hoping for green, pushing `[skip ci]` on a change-bearing commit, or force-pushing to hide history. (Poll states, CLI recipes, fix-red procedure, pre-existing-failure exception → `ci-cd-monitoring`.)
+
+## Task completion — no silent deferral (guardrail)
+
+- A task / issue / MR is **done** only when **every** in-scope item and stated acceptance criterion is actually delivered and verified in it. **MUST NOT** mark work complete while any item is unimplemented, stubbed, reverted, replaced with a weaker substitute, or pushed to a "follow-up" issue/PR, a `TODO`/`FIXME`, or a "known limitation" note. Difficulty or size is not a reason to defer — deliver more commits, not fewer items.
+- Genuinely blocked (confirmed upstream/tooling bug, missing access, irreversible/destructive step, or a decision needing human judgment) → **STOP** and surface it to the user with concrete evidence + a proposed path + an explicit ask, then wait. Never silently defer and report done; a user-acknowledged blocker is the only acceptable incomplete item.
 
 ## Figma
 
