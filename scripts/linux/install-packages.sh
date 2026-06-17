@@ -122,6 +122,8 @@ EOF
   # Add Tailscale repository
   "${SUDO[@]}" dnf config-manager addrepo --from-repofile https://pkgs.tailscale.com/stable/fedora/tailscale.repo --overwrite
 
+  "${SUDO[@]}" dnf config-manager addrepo --from-repofile https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo --overwrite
+
   # Add Proton VPN repository. The GUI package is still named
   # proton-vpn-gnome-desktop upstream; Proton documents limited support for
   # other Fedora desktop environments such as KDE.
@@ -258,6 +260,10 @@ EOF
       cuda-toolkit-13-3
       kmod-nvidia-latest-dkms
       nvidia-driver
+      nvidia-container-toolkit
+      nvidia-container-toolkit-base
+      libnvidia-container-tools
+      libnvidia-container1
     )
   fi
   "${SUDO[@]}" dnf install -y "${packages[@]}"
@@ -454,6 +460,13 @@ configure-time() {
   "${SUDO[@]}" timedatectl set-ntp true
 }
 
+set-up-nvidia-container-toolkit() {
+  if grep -qx '0x10de' /sys/bus/pci/devices/*/vendor 2>/dev/null; then
+    "${SUDO[@]}" nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+    "${SUDO[@]}" setsebool -P container_use_devices on
+  fi
+}
+
 configure-user-groups() {
   "${SUDO[@]}" usermod -aG keyd,libvirt,vboxusers "$USER"
   if getent group docker >/dev/null 2>&1; then "${SUDO[@]}" gpasswd -d "$USER" docker 2>/dev/null || true; fi
@@ -480,4 +493,5 @@ build-akmods
 install-virtualbox-extension-pack
 configure-time
 enable-services
+set-up-nvidia-container-toolkit
 configure-user-groups
