@@ -82,9 +82,11 @@ idiomatic_version_file_enable_tools = []
 minimum_release_age = "24h"
 minimum_release_age_excludes = [
   "gh",
+  "glab",
   "claude-code",
   "pipx",
   "npm:@google/gemini-cli",
+  "npm:@openai/codex",
   "github:njbrake/agent-of-empires",
   "github:anomalyco/opencode",
   "github:wakatime/wakatime-cli",
