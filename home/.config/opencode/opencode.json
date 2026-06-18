@@ -50,37 +50,6 @@
 				]
 			}
 		},
-		"typescript": {
-			"command": [
-				"mise",
-				"exec",
-				"-q",
-				"npm:@typescript/native-preview",
-				"--",
-				"tsgo",
-				"--lsp",
-				"--stdio"
-			],
-			"extensions": [
-				".ts",
-				".tsx",
-				".js",
-				".jsx",
-				".mts",
-				".mtsx",
-				".mjs",
-				".mjsx",
-				".cts",
-				".ctsx",
-				".cjs",
-				".cjsx"
-			],
-			"initialization": {
-				"preferences": {
-					"importModuleSpecifierPreference": "relative"
-				}
-			}
-		},
 		"marksman": {
 			"command": [
 				"mise",
