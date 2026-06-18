@@ -75,6 +75,20 @@
       stdout: true
       stderr: true
 
+# Re-patch the CLI-managed glab skill after `glab skills install` (the
+# install.conf.yaml step) rewrites it from upstream. Upstream writes scratch
+# files under the shared /tmp, which this repo denies (agents/SHARED_AGENTS.md
+# "Temporary / scratch files" + the opencode.json permission blocks); the patch
+# rewrites every /tmp/<file> path to the per-user temp dir. dotbot runs
+# install.conf.yaml fully before this per-OS file, so the install has already
+# happened. Idempotent: a no-op once patched. See scripts/bootstrap/patch-glab-skill.sh.
+- shell:
+    - command: bash scripts/bootstrap/patch-glab-skill.sh
+      description: Patch glab skill /tmp scratch paths to per-user temp dir (after glab skills install)
+      stdin: true
+      stdout: true
+      stderr: true
+
 # The Codex haptic hooks moved from a symlinked ~/.codex/hooks.json into the
 # managed ~/.codex/config.toml (merged by configure-codex-config). Remove the
 # now-orphaned symlink so Codex doesn't load a dangling hooks.json alongside the

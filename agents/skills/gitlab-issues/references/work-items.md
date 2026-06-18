@@ -29,7 +29,9 @@ checkbox prose when the project expects task objects:
 glab work-items list --type task -R <group>/<project> --per-page 100 --output json
 
 # Create a task. Reference the parent issue in the description when the CLI can't express hierarchy directly.
-cat > /tmp/task-body.md <<'EOF'
+# Scratch goes under the per-user temp dir — never /tmp.
+BODY="${XDG_RUNTIME_DIR:-$HOME/.cache}/task-body.md"
+cat > "$BODY" <<'EOF'
 Parent: #42
 
 Acceptance:
@@ -38,7 +40,7 @@ EOF
 
 glab work-items create --type task -R <group>/<project> \
   --title "Implement validateEmail()" \
-  --description "$(cat /tmp/task-body.md)" \
+  --description "$(cat "$BODY")" \
   --output json
 
 # Update task state fields.

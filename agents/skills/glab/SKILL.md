@@ -18,14 +18,14 @@ GitLab operations. Run `glab <command> --help` for detailed flag information.
 # Issues
 glab issue view <iid>
 glab issue list --label "bug,priority::1"
-glab issue create --title "title" --description "$(cat /tmp/desc.md)"
+glab issue create --title "title" --description "$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/desc.md)"
 glab issue note <iid> -m "comment text"
 
 # Merge requests
-glab mr create --push --title "fix: title" --description "$(cat /tmp/desc.md)"
+glab mr create --push --title "fix: title" --description "$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/desc.md)"
 glab mr view <iid>
 glab mr list --assignee <user>
-glab mr update <iid> --description "$(cat /tmp/desc.md)"
+glab mr update <iid> --description "$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/desc.md)"
 glab mr note create <iid> -m "comment text"
 
 # CI/CD
@@ -71,7 +71,7 @@ safest pattern for non-interactive use.
 
 ```shell
 # From a file
-glab mr note create <iid> < /tmp/body.md
+glab mr note create <iid> < ${XDG_RUNTIME_DIR:-$HOME/.cache}/body.md
 
 # Inline literal multi-line body — quoted heredoc, no shell expansion inside
 glab mr note create <iid> << 'EOF'
@@ -95,7 +95,7 @@ EOF
 
 For descriptions on `glab issue create` / `glab mr create` / `glab mr update`,
 inline a quoted heredoc into `--description`, or for very large or reusable
-bodies write to a file and use `--description "$(cat /tmp/desc.md)"`.
+bodies write to a file and use `--description "$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/desc.md)"`.
 
 ### Threaded replies on merge requests
 
@@ -164,12 +164,12 @@ glab api projects/:id/merge_requests/:iid -X PUT -f "assignee_id=1"
 glab api projects/:id/issues/:iid/notes -f body="comment text"
 
 # -F / --field — reads @file as a string
-glab api projects/:id/issues/:iid/notes -F body=@/tmp/comment.md
+glab api projects/:id/issues/:iid/notes -F body=@${XDG_RUNTIME_DIR:-$HOME/.cache}/comment.md
 
 # --input — raw request body from a file (or '-' for stdin). Does NOT set
 # Content-Type. Without the header, JSON endpoints return HTTP 415.
 glab api projects/:id/issues/:iid/notes \
-  --input /tmp/body.json \
+  --input ${XDG_RUNTIME_DIR:-$HOME/.cache}/body.json \
   -H "Content-Type: application/json"
 ```
 

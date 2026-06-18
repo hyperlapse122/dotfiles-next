@@ -65,6 +65,12 @@
 
 - **MUST** use the `tmux` tool (`mcp_interactive_bash`) for dev servers, watch modes, TUIs, REPLs, build watchers — anything that does not terminate. Regular shell execution blocks the session and is **forbidden** for non-terminating commands.
 
+## Temporary / scratch files
+
+- The **shared system temp** dir is **denied** — **MUST NOT** read, write, or execute under `/tmp`, `/var/tmp`, or `/dev/shm`; every operation on those paths fails. This covers ad-hoc scripts, captured logs / command output, and PR / MR / issue body drafts.
+- **MUST** use a **per-user** temp dir instead: `$XDG_RUNTIME_DIR` (or `~/.cache` when it is unset or the file is large) on Linux, `$TMPDIR` on macOS, `$env:TEMP` / `%TEMP%` on Windows. Keep scratch in a task-scoped subdir (e.g. `"$XDG_RUNTIME_DIR/agent-scratch"`) and **SHOULD** remove it when the task ends.
+- **SHOULD** prefer a git-ignored path **inside the workspace** for files that belong to the task; reserve the per-user temp dir for throwaway scratch that must stay outside the repo.
+
 ## Container runtime — rootless Podman (guardrail)
 
 - This host uses **rootless Podman** as its sole container runtime. Docker is not installed.

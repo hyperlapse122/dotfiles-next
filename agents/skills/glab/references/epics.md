@@ -34,13 +34,13 @@ glab api "groups/<group_id>/epics/<epic_iid>/issues" | jq '.[] | {iid, title, st
 # Simple epic
 glab api --method POST "groups/<group_id>/epics" \
   -f title="My Epic" \
-  -f "description=$(cat /tmp/epic-description.md)"
+  -f "description=$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/epic-description.md)"
 
 # With parent epic — parent_id is the INTERNAL id (not iid)
 PARENT_ID=$(glab api "groups/<group_id>/epics/<parent_iid>" | jq '.id')
 glab api --method POST "groups/<group_id>/epics" \
   -f title="Child Epic" \
-  -f "description=$(cat /tmp/description.md)" \
+  -f "description=$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/description.md)" \
   -f parent_id=$PARENT_ID
 ```
 
@@ -49,7 +49,7 @@ glab api --method POST "groups/<group_id>/epics" \
 ```bash
 glab api --method PUT "groups/<group_id>/epics/<iid>" \
   -f title="New Title" \
-  -f "description=$(cat /tmp/epic-description.md)"
+  -f "description=$(cat ${XDG_RUNTIME_DIR:-$HOME/.cache}/epic-description.md)"
 ```
 
 ## Close and reopen

@@ -57,7 +57,7 @@ only the labels that happened to exist) is the primary failure mode this section
 
    ```bash
    glab issue create -R <group>/<project> --title "..." \
-     --description "$(cat /tmp/issue-body.md)" \
+     --description "$(cat "${XDG_RUNTIME_DIR:-$HOME/.cache}/issue-body.md")" \
      --label "bug,area::reporting,priority::high"
    ```
 

@@ -46,7 +46,9 @@ UPLOAD_JSON=$(glab api --method POST projects/:fullpath/uploads --form "file=@./
 IMAGE_MD=$(echo "$UPLOAD_JSON" | jq -r '.markdown')
 
 # 2. Build description in a file (shell quoting mangles nested fences).
-cat > /tmp/issue-body.md <<EOF
+#    Scratch goes under the per-user temp dir — never /tmp.
+BODY="${XDG_RUNTIME_DIR:-$HOME/.cache}/issue-body.md"
+cat > "$BODY" <<EOF
 ## Summary
 Login form returns 500 on stale session.
 
@@ -56,7 +58,7 @@ EOF
 
 # 3. Create.
 glab issue create --title "fix(auth): login 500 on stale session" \
-  --description "$(cat /tmp/issue-body.md)" \
+  --description "$(cat "$BODY")" \
   --label "bug,area::auth,priority::high"
 ```
 
@@ -65,8 +67,9 @@ glab issue create --title "fix(auth): login 500 on stale session" \
 ```bash
 # Edit description in place.
 CURRENT=$(glab issue view <iid> -F json | jq -r '.description')
-printf '%s\n\n%s\n' "$CURRENT" "$IMAGE_MD" > /tmp/issue-body.md
-glab issue update <iid> --description "$(cat /tmp/issue-body.md)"
+BODY="${XDG_RUNTIME_DIR:-$HOME/.cache}/issue-body.md"
+printf '%s\n\n%s\n' "$CURRENT" "$IMAGE_MD" > "$BODY"
+glab issue update <iid> --description "$(cat "$BODY")"
 
 # Or attach via a comment (preferred for evidence in an in-flight discussion).
 glab issue note <iid> -m "Reproduction screenshot:

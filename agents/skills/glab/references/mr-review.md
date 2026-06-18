@@ -67,7 +67,7 @@ echo '{"note":"your comment","position":{"position_type":"text","base_sha":"BASE
 For multi-line note bodies, write the JSON to a temp file first:
 
 ```bash
-cat > /tmp/draft.json << 'DRAFT'
+cat > ${XDG_RUNTIME_DIR:-$HOME/.cache}/draft.json << 'DRAFT'
 {
   "note": "your comment here",
   "position": {
@@ -83,7 +83,7 @@ cat > /tmp/draft.json << 'DRAFT'
 DRAFT
 glab api --method POST \
   "projects/<project_id>/merge_requests/<mr_iid>/draft_notes" \
-  -H "Content-Type: application/json" --input /tmp/draft.json
+  -H "Content-Type: application/json" --input ${XDG_RUNTIME_DIR:-$HOME/.cache}/draft.json
 ```
 
 **Do NOT use `<(...)` process substitution** — it is not available in plain `sh`.
@@ -184,7 +184,7 @@ glab api --method PUT \
 ## Gotchas
 
 - **`-f` for inline notes → silently broken** — position won't serialize; use `--input -` with JSON and `-H "Content-Type: application/json"`
-- **No process substitution** — `<(...)` is bash-only; write JSON to `/tmp/` file if the note body is multi-line
+- **No process substitution** — `<(...)` is bash-only; write JSON to `${XDG_RUNTIME_DIR:-$HOME/.cache}/` file if the note body is multi-line
 - **SHA field name mismatch** — API returns `base_commit_sha` etc.; position object wants `base_sha` etc. — always apply the jq rename
 - **SHAs expire** — always fetch `/versions` fresh; cached SHAs from a previous version may be rejected
 - **Line numbers are diff-relative, not file-absolute** — count from hunk headers (`@@ -old,count +new,count @@`), not from the raw file

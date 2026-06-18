@@ -57,6 +57,19 @@
       stdout: true
       stderr: true
 
+# Re-patch the CLI-managed glab skill after `glab skills install` (the
+# install.conf.yaml step) rewrites it from upstream. Upstream writes scratch
+# files under the shared /tmp, which this repo denies (agents/SHARED_AGENTS.md
+# "Temporary / scratch files" + the opencode.json permission blocks); the patch
+# rewrites every /tmp/<file> path to the per-user temp dir. Idempotent: a no-op
+# once patched. See scripts/bootstrap/patch-glab-skill.ps1.
+- shell:
+    - command: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap/patch-glab-skill.ps1
+      description: Patch glab skill /tmp scratch paths to per-user temp dir (after glab skills install)
+      stdin: true
+      stdout: true
+      stderr: true
+
 # Remove ~/.gitconfig so the managed XDG config (~/.config/git/config) stays
 # authoritative. `gh auth login` / `glab auth login` run `git config --global`,
 # whose write target is ~/.gitconfig; git reads it AFTER the XDG file, so those

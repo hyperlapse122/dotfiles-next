@@ -26,23 +26,26 @@ Both hosts require a **full-body replacement**; no per-checkbox API. Fetch the c
 flip the exact `- [ ]` → `- [x]` lines, push the whole body back. Preserve every other byte:
 
 ```bash
+# Per-user scratch dir — never /tmp.
+SCRATCH="${XDG_RUNTIME_DIR:-$HOME/.cache}"
+
 # GitLab — issue
 CURRENT=$(glab issue view <iid> -F json | jq -r '.description')
 UPDATED=$(printf '%s' "$CURRENT" | sed 's|^- \[ \] Implement validateEmail()$|- [x] Implement validateEmail()|')
-printf '%s' "$UPDATED" > /tmp/issue-body.md
-glab issue update <iid> --description "$(cat /tmp/issue-body.md)"
+printf '%s' "$UPDATED" > "$SCRATCH/issue-body.md"
+glab issue update <iid> --description "$(cat "$SCRATCH/issue-body.md")"
 
 # GitLab — MR body (same pattern)
 CURRENT=$(glab mr view <iid> -F json | jq -r '.description')
-glab mr update <iid> --description "$(cat /tmp/mr-body.md)"
+glab mr update <iid> --description "$(cat "$SCRATCH/mr-body.md")"
 
 # GitHub — issue
 CURRENT=$(gh issue view <num> --json body -q '.body')
-gh issue edit <num> --body-file /tmp/issue-body.md
+gh issue edit <num> --body-file "$SCRATCH/issue-body.md"
 
 # GitHub — PR body
 CURRENT=$(gh pr view <num> --json body -q '.body')
-gh pr edit <num> --body-file /tmp/pr-body.md
+gh pr edit <num> --body-file "$SCRATCH/pr-body.md"
 ```
 
 **MUST NOT** pass a fresh body that omits sections you didn't regenerate — that silently

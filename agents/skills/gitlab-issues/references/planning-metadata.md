@@ -26,7 +26,7 @@ glab api --method POST projects/:fullpath/issues/<issue-iid>/time_estimate -f "d
 # New issue: set estimate at creation.
 glab issue create -R <group>/<project> \
   --title "fix(auth): reject expired sessions" \
-  --description "$(cat /tmp/issue-body.md)" \
+  --description "$(cat "${XDG_RUNTIME_DIR:-$HOME/.cache}/issue-body.md")" \
   --time-estimate 4h --due-date 2026-05-29
 ```
 

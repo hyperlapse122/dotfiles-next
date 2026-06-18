@@ -4,6 +4,8 @@ Files in this directory are **cross-tool agent rule files, shared slash commands
 
 > **`skills/` mixes CLI-managed and hand-authored skills.** Some skills are installed by the `skills` CLI (`npx skills`, tracked in `.skill-lock.json`) or by `glab skills install`; others are hand-authored. You MAY add or edit a skill by hand (create `skills/<name>/SKILL.md`), but **check the source first** — editing a CLI-managed skill (one in `.skill-lock.json`, or the `glab` skill) is overwritten on the next CLI run. `.skill-lock.json` itself is CLI-owned — don't hand-edit it. The rules below about tool-agnostic hand-authoring apply to `SHARED_AGENTS.md` and `commands/`, not to `skills/`.
 
+> **The `glab` skill is auto-patched away from `/tmp`.** After each `glab skills install`, the per-OS bootstrap step `scripts/bootstrap/patch-glab-skill.{sh,ps1}` rewrites every upstream `/tmp/<file>` scratch path in `skills/glab/*.md` to `${XDG_RUNTIME_DIR:-$HOME/.cache}/<file>`, because this repo denies `/tmp` for agent tools. So `skills/glab/` deliberately diverges from upstream here. **Don't hand-fix those paths** (a hand edit is overwritten by the next `glab skills install` anyway) — if the replacement needs to change, edit the patch script.
+
 > **Style**: Use [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) keywords (**MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**) for directives. Match the tone and structure of `SHARED_AGENTS.md`.
 
 ## Linkage

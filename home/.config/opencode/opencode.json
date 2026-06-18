@@ -122,7 +122,38 @@
 			"~/.local/share/opencode/auth*": "deny",
 			"/home/h82/.local/share/opencode/auth*": "deny",
 			"~/.config/glab-cli/config.yml": "deny",
-			"/home/h82/.config/glab-cli/config.yml": "deny"
+			"/home/h82/.config/glab-cli/config.yml": "deny",
+			"~/.config/opencode/opencode.json": "deny",
+			"/home/h82/.config/opencode/opencode.json": "deny",
+			"/tmp/**": "deny",
+			"/var/tmp/**": "deny",
+			"/dev/shm/**": "deny"
+		},
+		"edit": {
+			"~/.secrets/**": "deny",
+			"/home/h82/.secrets/**": "deny",
+			"~/.local/share/opencode/auth*": "deny",
+			"/home/h82/.local/share/opencode/auth*": "deny",
+			"~/.config/glab-cli/config.yml": "deny",
+			"/home/h82/.config/glab-cli/config.yml": "deny",
+			"~/.config/opencode/opencode.json": "deny",
+			"/home/h82/.config/opencode/opencode.json": "deny",
+			"/tmp/**": "deny",
+			"/var/tmp/**": "deny",
+			"/dev/shm/**": "deny"
+		},
+		"glob": {
+			"~/.secrets/**": "deny",
+			"/home/h82/.secrets/**": "deny",
+			"~/.local/share/opencode/auth*": "deny",
+			"/home/h82/.local/share/opencode/auth*": "deny",
+			"~/.config/glab-cli/config.yml": "deny",
+			"/home/h82/.config/glab-cli/config.yml": "deny",
+			"~/.config/opencode/opencode.json": "deny",
+			"/home/h82/.config/opencode/opencode.json": "deny",
+			"/tmp/**": "deny",
+			"/var/tmp/**": "deny",
+			"/dev/shm/**": "deny"
 		},
 		"bash": {
 			"*": "allow",
@@ -132,6 +163,8 @@
 			"cat /home/h82/.local/share/opencode/auth*": "deny",
 			"cat ~/.config/glab-cli/config.yml": "deny",
 			"cat /home/h82/.config/glab-cli/config.yml": "deny",
+			"cat ~/.config/opencode/opencode.json": "deny",
+			"cat /home/h82/.config/opencode/opencode.json": "deny",
 			"glab auth status -t": "deny",
 			"glab auth status --show-token": "deny"
 		}
