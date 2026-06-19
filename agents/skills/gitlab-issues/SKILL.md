@@ -8,8 +8,8 @@ description: >
   to an issue/task description, or write a rich issue/task body (mermaid,
   tables, templates). It covers `glab issue view` vs `glab api`, the
   work-item URL gotcha, the list→match→create→apply label workflow,
-  `glab api --form` image uploads, and the bug/feature description
-  templates. Do NOT load it for pull-/merge-request lifecycle work (use
+  `glab api --form` image uploads, decision-complete bodies (resolve
+  forks, don't defer), and the bug/feature description templates. Do NOT load it for pull-/merge-request lifecycle work (use
   `pr-mr`) — including the PR/MR body checklist sync — or for pipeline
   monitoring (use `ci-cd-monitoring`). The "never surface an auth token"
   guardrail lives in core AGENTS.md and applies regardless.
@@ -85,6 +85,30 @@ carry `--name`, `--color` HEX, `--description`) is mandatory →
 [`references/label-workflow.md`](references/label-workflow.md). If the right label genuinely
 can't be determined, pick the closest existing label, note the uncertainty in the body, and
 ask the user in the same turn — **MUST NOT** silently downgrade to fewer labels.
+
+## Decision-complete bodies — resolve forks, don't defer
+
+An issue/task body **MUST** be decision-complete: a reader **MUST** be able to start
+implementing without another round of questions. Every design fork you can settle from the
+codebase, existing conventions, or a defensible default **MUST** be settled in the body and
+written as a **decision**, not a question.
+
+- **MUST NOT** ship an "Open questions", "TBD", "To be decided", or "Open/Notes — maybe"
+  section that hands unresolved design choices to the implementer. Investigate the repo and
+  decide; an empty fork is a research task, not a deliverable to defer.
+- **MUST** write each settled fork as a decision, with a one-line rationale when the choice
+  is non-obvious (e.g. `Decision: hide unresolved services, don't drop silently — operators
+  still get a server-side warn`). When you picked a default rather than a hard requirement,
+  phrase it `Decision: X — revisit if Y`, so it reads as settled with an explicit
+  change-trigger instead of an open question.
+- **SHOULD** prefer **phased scope** over open questions: decide v1 now, then name and defer
+  later phases explicitly. A deferred phase is a decision; an open question is not.
+- A fork you **genuinely cannot** resolve — it needs product/human judgement, is
+  irreversible, or needs access you lack — is the **only** thing that may stay unresolved.
+  **MUST** raise it to the user **in the same turn** (options + your recommendation) and
+  resolve it before finalizing rather than parking a vague question in the body. If it must
+  be parked, record it as a **blocking decision needed** with options and a recommended
+  default — never as an open-ended question.
 
 ## Rich content in descriptions
 
