@@ -47,6 +47,7 @@
 
     # git (XDG path, picked up by git on all 3 OSes)
     ~/.config/git/config: home/.config/git/config
+    ~/.config/git/ignore: home/.config/git/ignore
 
     # mise (dev tool version manager, cross-platform)
     ~/.config/mise/config.toml: home/.config/mise/config.toml
