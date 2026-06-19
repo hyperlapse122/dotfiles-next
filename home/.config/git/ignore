@@ -75,3 +75,6 @@ $RECYCLE.BIN/
 ### oh-my-openagent ###
 .omo/
 .sisyphus/
+
+### CodeGraph ###
+.codegraph/
