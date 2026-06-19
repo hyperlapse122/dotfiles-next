@@ -104,7 +104,7 @@ Run once per OS, `install.sh` / `install.ps1` invoke `mise exec uv@latest -- uvx
 
 ## Re-running
 
-`./install.sh` and `.\install.ps1` are **idempotent** — dotbot creates missing parents, relinks existing symlinks, and forces repo-managed links over real files at managed targets (`force: true`, overwrite behavior — not `stow --adopt`); `mise install` refreshes tools; helper scripts skip or overwrite deterministic targets safely. Run them again after every `git pull`.
+`./install.sh` and `.\install.ps1` are **idempotent** — dotbot creates missing parents, relinks existing symlinks, and forces repo-managed links over real files at managed targets (`force: true`, overwrite behavior — not `stow --adopt`); `mise install` refreshes tools; helper scripts skip or overwrite deterministic targets safely. One deliberate exception adopts in the other direction: before relinking, `agent-of-empires`' `config.toml` is copied back into the repo when the tool has replaced its managed symlink with a real file (its in-app config save does this), so a setting you changed in the app is captured rather than clobbered — review and commit the resulting repo change. Run them again after every `git pull`.
 
 - `scripts/linux/install-packages.sh` and `scripts/linux/setup-luks-tpm2-unlock.sh` are **manual** (they need `sudo` / an interactive passphrase) and are not part of `install.sh`.
 - The Linux `/etc` and KDE steps no-op without a TTY (so agent/CI runs don't hang on `sudo`); re-run [`scripts/linux/install-linux-system-config.sh`](./scripts/linux/install-linux-system-config.sh) and [`scripts/linux/config-kde.sh`](./scripts/linux/config-kde.sh) manually if they were skipped.

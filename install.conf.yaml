@@ -86,6 +86,26 @@
       description: Merge shared Codex settings into ~/.codex/config.toml
       stdout: true
       stderr: true
+    # Adopt the live agent-of-empires config INTO the repo BEFORE the link below
+    # relinks it. The tool saves config by renaming a temp file over the path,
+    # replacing the managed symlink with a real file; the `force: true` relink
+    # would then clobber it with a symlink to STALE repo content. Placed after
+    # `mise install` (so bun is present) and before the agent-of-empires `- link:`
+    # directive. Bare `mise exec bun` like the Codex merge above, so it also runs
+    # under Windows cmd.exe. See scripts/bootstrap/adopt-agent-of-empires-config.mjs.
+    - command: mise exec bun -- bun scripts/bootstrap/adopt-agent-of-empires-config.mjs
+      description: Adopt live agent-of-empires config into the repo before its relink
+      stdout: true
+      stderr: true
+
+# agent-of-empires config — cross-platform link (same ~/.config path on all 3
+# OSes). On Linux the ~/.config/**/* glob in install.linux.yaml also covers it;
+# this explicit entry extends the same management to macOS and Windows. MUST come
+# after the adopt shell step above so the relink preserves a tool-written real
+# file instead of clobbering it. The rest of ~/.config/agent-of-empires/ is
+# machine-local tool state (DBs, tokens, logs) and is deliberately NOT linked.
+- link:
+    ~/.config/agent-of-empires/config.toml: home/.config/agent-of-empires/config.toml
 
 # Build the packages/ Yarn workspace (turbo build). The toolchain (Node +
 # Yarn 4) comes from packages/mise.toml via `mise -C packages exec`: dotbot's
