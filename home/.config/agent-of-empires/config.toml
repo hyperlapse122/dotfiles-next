@@ -51,6 +51,7 @@ clipboard = "auto"
 default_tool = "opencode"
 yolo_mode_default = false
 agent_status_hooks = true
+smart_rename = true
 mouse_capture = true
 strict_hotkeys = false
 snooze_duration_minutes = 30
@@ -77,6 +78,8 @@ on_launch = [
     "mise install",
 ]
 
+[host_hooks]
+
 [sound]
 enabled = true
 mode = "random"
@@ -88,9 +91,10 @@ debounce_ms = 100
 [app_state]
 has_seen_welcome = true
 has_seen_web_tour = false
-last_seen_version = "1.11.0"
+last_seen_version = "1.11.1"
 has_responded_to_telemetry = true
 has_seen_custom_instruction_warning = false
+has_seen_non_git_project_warning = false
 has_acknowledged_agent_hooks = true
 has_acknowledged_volume_ignores_globs = false
 
@@ -119,6 +123,7 @@ silent_orphan_fast_grace_secs = 20
 auto_stop_idle_secs = 0
 rate_limit_auto_resume = false
 rate_limit_auto_resume_grace_secs = 15
+allow_agent_install = false
 
 [logging]
 default_level = "info"
