@@ -9,6 +9,6 @@
   },
   "diff_style": "auto",
   "plugin": [
-    "oh-my-openagent@4.11.1/tui"
+    "oh-my-openagent@4.12.0/tui"
   ]
 }
