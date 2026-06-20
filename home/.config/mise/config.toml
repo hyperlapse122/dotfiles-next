@@ -52,6 +52,7 @@ claude-code = "latest"
   "linux",
   "macos",
 ] }
+"npm:yaml-language-server" = "latest"
 
 [tools."github:anomalyco/opencode"]
 version = "latest"
