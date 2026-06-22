@@ -1,11 +1,14 @@
 name: update-opencode-plugin
 
 # Reusable workflow: check ONE opencode plugin's pinned version across one or
-# more opencode config files against the latest GitHub release of its upstream
-# repo, and open a single PR bumping every file that references it when they
-# differ. Parameterized so it can be reused for any plugin added to opencode
-# later — the caller (opencode-plugin-updates.yml) drives it once per plugin via
-# a matrix.
+# more opencode config files against its upstream source — the latest GitHub
+# release (source=github-release, the default) or the npm registry (source=npm,
+# for plugins published to npm without GitHub releases) — and open a single PR
+# bumping every file that references it when they differ. The npm source honors
+# the repo's dependency cooldown (cooldown-days) and skips prereleases, so the
+# automation never bumps to a too-fresh or pre-release version. Parameterized so
+# it can be reused for any plugin added to opencode later — the caller
+# (opencode-plugin-updates.yml) drives it once per plugin via a matrix.
 #
 # The version bump is a literal, formatting-preserving text substitution
 # (Perl \Q..\E) on the version token, not a jq rewrite: it preserves each
@@ -22,21 +25,43 @@ on:
           Plugin package name exactly as it appears in the opencode config
           "plugin" array, WITHOUT the @version suffix
           (e.g. "oh-my-openagent" or "@ex-machina/opencode-anthropic-auth").
+          For source=npm this doubles as the npm package name that is queried.
         required: true
+        type: string
+      source:
+        description: >-
+          Where the latest version comes from: "github-release" (default) reads
+          the latest GitHub release of `repository`; "npm" reads the npm registry
+          for `plugin`, picking the newest stable (non-prerelease) version at
+          least `cooldown-days` old. Use "npm" for plugins published to npm
+          without GitHub releases.
+        required: false
+        default: "github-release"
         type: string
       repository:
         description: >-
           GitHub "owner/repo" whose latest release is the source of truth for
-          this plugin's version (e.g. "code-yeongyu/oh-my-openagent").
-        required: true
+          this plugin's version (e.g. "code-yeongyu/oh-my-openagent"). Required
+          for source=github-release; leave empty (unused) for source=npm.
+        required: false
+        default: ""
         type: string
       tag-prefix:
         description: >-
           Prefix stripped from the release tag to derive the bare version.
           Both current upstreams tag as "vX.Y.Z" while the config pins "X.Y.Z".
+          Only used for source=github-release.
         required: false
         default: "v"
         type: string
+      cooldown-days:
+        description: >-
+          source=npm only: minimum age in days a version must have before it is
+          eligible, matching the repo's 1-week dependency cooldown
+          (npmMinimalAgeGate = 10080 minutes). Prereleases are always skipped.
+        required: false
+        default: 7
+        type: number
       config-paths:
         description: >-
           Newline-separated list of repo-relative opencode config files to
@@ -68,15 +93,63 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PLUGIN: ${{ inputs.plugin }}
+          SOURCE: ${{ inputs.source }}
           REPO: ${{ inputs.repository }}
           TAG_PREFIX: ${{ inputs.tag-prefix }}
+          COOLDOWN_DAYS: ${{ inputs.cooldown-days }}
           CONFIGS: ${{ inputs.config-paths }}
         run: |
           set -euo pipefail
 
-          # Latest published release tag from upstream, prefix stripped.
-          tag="$(gh release view --repo "$REPO" --json tagName --jq '.tagName')"
-          latest="${tag#"$TAG_PREFIX"}"
+          # Resolve the latest upstream version + a human-readable source link.
+          # source=github-release takes the latest release tag (prefix stripped);
+          # source=npm takes the newest stable version on the registry that is at
+          # least COOLDOWN_DAYS old, so the automation honors the repo's
+          # dependency cooldown and never bumps to a prerelease or too-fresh pin.
+          if [ "$SOURCE" = "npm" ]; then
+            # The node script below is single-quoted on purpose: its ${...} are
+            # JS template literals evaluated by node, not shell expansions.
+            # shellcheck disable=SC2016
+            latest="$(
+              npm view "$PLUGIN" --json \
+                | COOLDOWN_DAYS="$COOLDOWN_DAYS" PLUGIN="$PLUGIN" node -e '
+                    const data = JSON.parse(require("fs").readFileSync(0, "utf8"));
+                    const cutoff =
+                      Date.now() - Number(process.env.COOLDOWN_DAYS) * 86400000;
+                    const times = data.time || {};
+                    const eligible = (data.versions || [])
+                      .filter((v) => !v.includes("-"))
+                      .filter((v) => times[v] && Date.parse(times[v]) <= cutoff);
+                    if (eligible.length === 0) {
+                      console.error(
+                        `No stable ${process.env.PLUGIN} version is >= ` +
+                          `${process.env.COOLDOWN_DAYS}d old yet.`,
+                      );
+                      process.exit(1);
+                    }
+                    const cmp = (a, b) => {
+                      const pa = a.split(".").map(Number);
+                      const pb = b.split(".").map(Number);
+                      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                        const d = (pa[i] || 0) - (pb[i] || 0);
+                        if (d !== 0) return d;
+                      }
+                      return 0;
+                    };
+                    eligible.sort(cmp);
+                    console.log(eligible[eligible.length - 1]);
+                  '
+            )"
+            source_url="https://www.npmjs.com/package/${PLUGIN}/v/${latest}"
+          else
+            if [ -z "$REPO" ]; then
+              echo "::error::source=github-release requires a non-empty 'repository' for $PLUGIN"
+              exit 1
+            fi
+            tag="$(gh release view --repo "$REPO" --json tagName --jq '.tagName')"
+            latest="${tag#"$TAG_PREFIX"}"
+            source_url="https://github.com/${REPO}/releases/tag/${tag}"
+          fi
 
           # Escape the package name for the grep regex (it may contain '.', etc.;
           # '/' is not special in ERE so it is left alone to avoid grep's "stray \
@@ -108,9 +181,9 @@ jobs:
           fi
 
           {
-            echo "tag=$tag"
             echo "current=$current"
             echo "latest=$latest"
+            echo "source_url=$source_url"
           } >>"$GITHUB_OUTPUT"
 
           if [ "$current" = "$latest" ]; then
@@ -127,11 +200,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
           PLUGIN: ${{ inputs.plugin }}
-          REPO: ${{ inputs.repository }}
           CONFIGS: ${{ inputs.config-paths }}
           CURRENT: ${{ steps.versions.outputs.current }}
           LATEST: ${{ steps.versions.outputs.latest }}
-          RELEASE_TAG: ${{ steps.versions.outputs.tag }}
+          SOURCE_URL: ${{ steps.versions.outputs.source_url }}
         run: |
           set -euo pipefail
 
@@ -201,7 +273,7 @@ jobs:
           | Current | \`${CURRENT}\` |
           | Latest | \`${LATEST}\` |
 
-          Source: https://github.com/${REPO}/releases/tag/${RELEASE_TAG}
+          Source: ${SOURCE_URL}
 
           Opened by the \`opencode-plugin-updates\` automation.
           EOF

@@ -38,16 +38,25 @@ jobs:
           # oh-my-openagent is pinned in both opencode.json and tui.json (the
           # latter as "<plugin>@<version>/tui"); bump both in one PR.
           - plugin: oh-my-openagent
+            source: github-release
             repository: code-yeongyu/oh-my-openagent
             config-paths: |
               home/.config/opencode/opencode.json
               home/.config/opencode/tui.json
           - plugin: "@ex-machina/opencode-anthropic-auth"
+            source: github-release
             repository: ex-machina-co/opencode-anthropic-auth
+            config-paths: home/.config/opencode/opencode.json
+          # opencode-agy-auth ships to npm without GitHub releases, so its
+          # version is tracked from the npm registry (newest stable past the
+          # cooldown). No repository is needed for source=npm.
+          - plugin: "@anthonyhaussman/opencode-agy-auth"
+            source: npm
             config-paths: home/.config/opencode/opencode.json
     uses: ./.github/workflows/update-opencode-plugin.yml
     with:
       plugin: ${{ matrix.plugin }}
+      source: ${{ matrix.source }}
       repository: ${{ matrix.repository }}
       config-paths: ${{ matrix.config-paths }}
     permissions:
