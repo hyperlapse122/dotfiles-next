@@ -78,3 +78,4 @@ $RECYCLE.BIN/
 
 ### CodeGraph ###
 .codegraph/
+.codegraph
