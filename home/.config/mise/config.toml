@@ -43,6 +43,7 @@ usage = "latest"
 "npm:tokscale" = { version = "latest" }
 "npm:typescript-language-server" = { version = "latest" }
 "npm:wrangler" = { version = "latest" }
+"npm:yaml-language-server" = "latest"
 
 # Agentic AI
 claude-code = "latest"
@@ -52,7 +53,7 @@ claude-code = "latest"
   "linux",
   "macos",
 ] }
-"npm:yaml-language-server" = "latest"
+antigravity-cli = "latest"
 
 [tools."github:anomalyco/opencode"]
 version = "latest"
