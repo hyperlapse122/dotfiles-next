@@ -18,7 +18,8 @@ User-facing quickstart belongs in `README.md` (top-level). This file (`AGENTS.md
 │                                    # workflows/tooling.yml (shellcheck/PSScriptAnalyzer/actionlint/
 │                                    # dotbot-link guard/Codex config tests) = CI for scripts + install*.yaml + workflows;
 │                                    # workflows/opencode-plugin-updates.yml + update-opencode-plugin.yml
-│                                    # = hourly opencode plugin release-bump PRs.
+│                                    # = hourly opencode plugin release-bump PRs;
+│                                    # workflows/socket.yml (Socket supply-chain scan) = dependency gate on all pushes/PRs.
 ├── agents/                          # Cross-tool agent rules + shared slash commands + runtime skill tree.
 │                                    # SHARED_AGENTS.md links into ~/.config/opencode/AGENTS.md, ~/.codex/AGENTS.md, and ~/.claude/CLAUDE.md.
 │                                    # commands/ links into ~/.config/opencode/commands and ~/.codex/prompts.

@@ -17,6 +17,7 @@ the repository root.
 | [`workflows/lint.yml`](workflows/lint.yml) | CI for the [`packages/`](../packages/) Yarn workspace — ESLint lint + Prettier format-check on every member, on the same triggers. Split from `packages.yml` so a style regression is reported independently of a build/test failure. |
 | [`workflows/rust.yml`](workflows/rust.yml) | CI for the [`crates/`](../crates/) Rust workspace — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo check --all-targets`, and `cargo test` on pushes to `main` and PRs that touch `crates/**`. |
 | [`workflows/tooling.yml`](workflows/tooling.yml) | CI for everything outside `packages/` and `crates/` — shellcheck (`*.sh`), PSScriptAnalyzer (`*.ps1`), actionlint (the workflows), a dotbot link-source guard (`install*.yaml`), and the Codex config merger Bun tests. Five independent jobs. |
+| [`workflows/socket.yml`](workflows/socket.yml) | Supply-chain security gate — runs a [Socket](https://socket.dev) scan (`socketcli`) on every push (all branches), PR (opened/synchronize/reopened), and issue comment, flagging risky dependency changes before they land. Needs the `SOCKET_SECURITY_API_KEY` repo secret. |
 | [`workflows/opencode-plugin-updates.yml`](workflows/opencode-plugin-updates.yml) | Hourly (cron) + manual dispatcher that fans out over a matrix of opencode plugins, calling the reusable `update-opencode-plugin.yml` once per plugin. |
 | [`workflows/update-opencode-plugin.yml`](workflows/update-opencode-plugin.yml) | Reusable (`workflow_call`) workflow that compares one plugin's pinned version across one or more opencode config files (e.g. [`opencode.json`](../home/.config/opencode/opencode.json) + [`tui.json`](../home/.config/opencode/tui.json)) against the latest GitHub release of its upstream repo and opens a single PR bumping every file that references it. |
 
@@ -82,6 +83,28 @@ jobs on `ubuntu-24.04`:
 - **codex-config.** Uses `jdx/mise-action` to provision Bun, then runs
   `mise exec bun@latest -- bun test scripts/bootstrap/` so the surgical Codex
   config merger is tested before bootstrap changes ship.
+
+## `workflows/socket.yml`
+
+Supply-chain protection: catches malicious or risky dependency changes via
+[Socket](https://socket.dev) before they merge.
+
+- **Triggers.** Every `push` on **all** branches, `pull_request`
+  (opened/synchronize/reopened), and `issue_comment` (created — for Socket's PR
+  comment interactions). A `concurrency` group keyed on ref + SHA cancels
+  superseded runs.
+- **Steps.** `actions/checkout` (full history on push; depth 2 on PRs for diff
+  analysis) → `actions/setup-python` (3.12) → `pip install socketsecurity
+  --upgrade` → `socketcli --target-path "$GITHUB_WORKSPACE" --scm github
+  --pr-number <n>`. The CLI auto-detects repo, branch, commit, committer, and
+  changed files from git.
+- **Secrets + permissions.** Requires the `SOCKET_SECURITY_API_KEY` repo secret;
+  uses the default `GITHUB_TOKEN` (as `GH_API_TOKEN`) to post PR comments.
+  Declares `issues: write`, `pull-requests: write`, `contents: read`.
+- **Python is intentional here.** Socket's CLI is distributed only as a Python
+  package (`socketsecurity`), so this workflow uses Python to run an external
+  tool — it is **not** repo-authored Python and is exempt from the Node/Bun
+  scripting rule in [`AGENTS.md`](../AGENTS.md).
 
 ## `workflows/opencode-plugin-updates.yml` + `workflows/update-opencode-plugin.yml`
 
