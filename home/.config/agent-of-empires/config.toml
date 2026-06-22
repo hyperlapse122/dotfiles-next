@@ -92,11 +92,13 @@ debounce_ms = 100
 has_seen_welcome = true
 has_seen_web_tour = false
 last_seen_version = "1.11.1"
+home_list_width = 35
 has_responded_to_telemetry = true
 has_seen_custom_instruction_warning = false
 has_seen_non_git_project_warning = false
 has_acknowledged_agent_hooks = true
 has_acknowledged_volume_ignores_globs = false
+archived_section_collapsed = false
 
 [web]
 notifications_enabled = true
