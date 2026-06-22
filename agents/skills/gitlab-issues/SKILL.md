@@ -101,8 +101,12 @@ written as a **decision**, not a question.
   still get a server-side warn`). When you picked a default rather than a hard requirement,
   phrase it `Decision: X — revisit if Y`, so it reads as settled with an explicit
   change-trigger instead of an open question.
-- **SHOULD** prefer **phased scope** over open questions: decide v1 now, then name and defer
-  later phases explicitly. A deferred phase is a decision; an open question is not.
+- **SHOULD** scope each issue to a **single MR-sized deliverable** and settle everything in
+  that scope now. **MUST NOT** structure the body as sequential delivery phases
+  ("Phase 1 / Phase 2 …") that imply multiple MRs — one issue is delivered by exactly one MR
+  (see `pr-mr`). Genuinely separable later work (its own maintenance window, a human/infra
+  decision, an independent release) → a **separate follow-up issue** (itself one MR), named
+  and linked (`Refs #N`), not a deferred phase of this one.
 - A fork you **genuinely cannot** resolve — it needs product/human judgement, is
   irreversible, or needs access you lack — is the **only** thing that may stay unresolved.
   **MUST** raise it to the user **in the same turn** (options + your recommendation) and

@@ -18,6 +18,15 @@ description: >
 
 # Pull requests / merge requests
 
+## One issue → one MR (no phase-splitting)
+
+One issue/work item is delivered by **exactly one** MR, no matter how large:
+
+- **MUST NOT** split an issue across multiple MRs, "stacked" MRs, or a Phase 1 / Phase 2 / Phase 3 sequence of MRs. Size is never a reason to split — add more commits to the single MR, not more MRs.
+- **MUST NOT** open a second MR for "the rest" of an issue. A large checklist stays on the one draft MR; tick items as they land.
+- Work that is **genuinely separable** (needs its own maintenance window, a human/infra decision, or an independent release) belongs to a **separate issue** with its **own** single MR — link it as a follow-up (`Refs #N`). It is **never** a later "phase" of the current issue's MR.
+- An issue body authored as sequential delivery phases that imply multiple MRs is a **defect**: fold the in-scope phases into the one deliverable and move any truly-separate phase out to its own issue (see `gitlab-issues`).
+
 ## Required ordering — draft up-front, work against it, promote to ready
 
 Issue linking happens **after** the PR/MR exists, never before:

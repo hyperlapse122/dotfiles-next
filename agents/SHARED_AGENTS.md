@@ -46,6 +46,11 @@
 
 - During a rebase Git's `--ours` / `--theirs` are **reversed** vs merge: `--ours` is the rebase target (`main`), `--theirs` is the feature commit being applied. Wrong side / direction → `git rebase --abort` and restart; **MUST NOT** continue. (Intent-based conflict resolution → `git-workflow`.)
 
+## Issue ↔ MR scope
+
+- One issue / work item is delivered by **exactly one** MR, regardless of size — **MUST NOT** split it into "phases", stacked/sequential MRs, or a chain of follow-up MRs. Deliver more commits in the single MR, not more MRs.
+- **MUST NOT** author or restructure an issue body as sequential delivery "Phase 1 / Phase 2 …" sections that imply multiple MRs. Genuinely separable later work (a prod cut-over, a future migration) → a **separate issue** (itself one MR), linked as a follow-up — never a numbered delivery phase of the current issue. (Detail → `pr-mr`, `gitlab-issues`.)
+
 ## CI/CD
 
 - **MUST** monitor the pipeline to a terminal state on every push that opens or updates a PR/MR — the task is done when it lands green, not when the push succeeds. **MUST NOT** declare ready / complete while a pipeline is failing, cancelled, or running.
