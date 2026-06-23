@@ -45,6 +45,11 @@ usage = "latest"
 "npm:wrangler" = { version = "latest" }
 "npm:yaml-language-server" = "latest"
 
+# Local Kubernetes development environment
+helm = "latest"
+minikube = "latest"
+kubectl = "latest"
+
 # Agentic AI
 claude-code = "latest"
 "npm:@google/gemini-cli" = { version = "latest" }
