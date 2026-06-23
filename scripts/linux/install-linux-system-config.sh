@@ -160,6 +160,7 @@ REMOVED_ETC_PATHS=(
   /etc/modprobe.d/audio-hda-no-powersave.conf
   /etc/systemd/system/docker-prune.service
   /etc/systemd/system/docker-prune.timer
+  /etc/udev/rules.d/logitech-receiver.rules
 )
 
 removed_listed=0

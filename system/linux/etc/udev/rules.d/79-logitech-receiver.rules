@@ -1,1 +1,2 @@
+# Disable Logitech wireless device (Unifying and Logi Bolt) wakes PC up
 ACTION=="add", SUBSYSTEM=="usb", DRIVERS=="usb", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c52b|c548", ATTR{power/wakeup}="disabled"
