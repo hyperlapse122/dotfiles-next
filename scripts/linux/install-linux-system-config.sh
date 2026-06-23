@@ -310,6 +310,28 @@ else
   printf '  -- firewalld: skipped (firewalld not running)\n'
 fi
 
+# Reference: https://tailscale.com/docs/reference/linux-dns
+# TODO: organize these codes.
+"${SUDO[@]}" ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+  printf '  -> systemctl restart systemd-resolved\n'
+  "${SUDO[@]}" systemctl restart systemd-resolved
+else
+  printf '  -- systemd-resolved reload: skipped (service not running)\n'
+fi
+if systemctl is-active --quiet NetworkManager 2>/dev/null; then
+  printf '  -> systemctl restart NetworkManager\n'
+  "${SUDO[@]}" systemctl restart NetworkManager
+else
+  printf '  -- NetworkManager reload: skipped (service not running)\n'
+fi
+if systemctl is-active --quiet tailscaled 2>/dev/null; then
+  printf '  -> systemctl restart tailscaled\n'
+  "${SUDO[@]}" systemctl restart tailscaled
+else
+  printf '  -- tailscaled reload: skipped (service not running)\n'
+fi
+
 # Remove dangling symlinks under /etc/NetworkManager/conf.d/. A drop-in
 # installed by another tool as a symlink into a store/cache path becomes a
 # broken link once that target is removed; NetworkManager then logs
