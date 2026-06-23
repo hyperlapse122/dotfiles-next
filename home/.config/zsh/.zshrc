@@ -88,3 +88,6 @@ fi
 if [[ -f /opt/adguard-cli/bash-completion.sh ]]; then
   source /opt/adguard-cli/bash-completion.sh
 fi
+
+# bun completions
+[ -s "/home/h82/.cache/bun-latest/_bun" ] && source "/home/h82/.cache/bun-latest/_bun"
